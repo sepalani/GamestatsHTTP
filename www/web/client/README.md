@@ -100,67 +100,105 @@ HTTP/1.1 200 TODO
 
 ## /put2.asp
 
-### Example (Tatsunoko VS. Capcom: Ultimate All Stars)
+### Example (Mario Strikers Charged Football)
 #### Without Hash
 ```HTTP
-GET /tatvscapwii/web/client/put2.asp?pid=249290728 HTTP/1.1
+GET /mschargedwii/web/client/put2.asp?pid=355776439 HTTP/1.1
 Host: gamestats2.gs.nintendowifi.net
 User-Agent: GameSpyHTTP/1.0
 Connection: close
 ```
 ```HTTP
 HTTP/1.1 200 OK
-Date: Sat, 07 May 2011 13:08:35 GMT
+Date: Sun, 18 May 2014 11:44:50 GMT
 Server: Microsoft-IIS/6.0
 p3p: CP='NOI ADMa OUR STP'
-X-Powered-By: ASP.NET
-cluster-server: gstprdweb12.las1.colo.ignops.com
+cluster-server: gstprdweb13.las1.colo.ignops.com
 X-Powered-By: ASP.NET
 Content-Length: 32
 Content-Type: text/html
-Set-Cookie: ASPSESSIONIDCSBDTSCD=KOEKABKCPAPGEFONCEHADKEA; path=/
+Set-Cookie: ASPSESSIONIDCATBCDCD=PHKJJNEAEICIGKFNNMFMECDD; path=/
 Cache-control: private
 
-Eisq8fZ2s33Wriz3iku8rE9Tz1WgWh4x
+yTeitsg1L1AD5u8bmx5T8VpS9QK7vNGX
 ```
 
 #### With Hash
 ```HTTP
-GET /tatvscapwii/web/client/put2.asp?pid=249290728&hash=a619fbb3a5fe6b680ae70a747dc2c747e256502d&data=aFtrRUhZ2g5cAAAA_wAAAAAAAABgHwAATAAAAAAACCsAAAAAAAADPwAADI4AAB9gAAAAAP__Izn__x4OAAD__wAAAAEAAAATAFMATQBUAEAARABEAFIAIAAgAAAAAAAAAAAAAAAAAAA= HTTP/1.1
+GET /mschargedwii/web/client/put2.asp?pid=355776439&hash=a991ad96336e6ebcbdef5676f140a300a2a7b5de&data=QttED7e3NBWQAAAABAAAAAIAAAAQAAAAgAAAABIFB94AAAABAAAAAgACAHMAZQBiAAD_Vf3I-8MAqv9V_cj746hWAHMAZQBiAAAAAAAAAAAAAAAAAAB_UYB2N3fCXLmQIAxmAAGWCKIIjAhANEiYjTCKAIolBQAAAAAAAAAAAAAAAAAAAAAAAAAAlveDTEEndGCCEhX5wMekPim2 HTTP/1.1
 Host: gamestats2.gs.nintendowifi.net
 User-Agent: GameSpyHTTP/1.0
 Connection: close
 ```
 ```HTTP
 HTTP/1.1 200 OK
-Date: Sat, 07 May 2011 13:08:35 GMT
+Date: Sun, 18 May 2014 11:44:51 GMT
 Server: Microsoft-IIS/6.0
 p3p: CP='NOI ADMa OUR STP'
+cluster-server: gstprdweb15.las1.colo.ignops.com
 X-Powered-By: ASP.NET
-cluster-server: gstprdweb13.las1.colo.ignops.com
 Content-Length: 44
 Content-Type: text/html
-Set-Cookie: ASPSESSIONIDQQCADDRC=FNGBCLJCKMKJGCDPPGCPGNJG; path=/
+Set-Cookie: ASPSESSIONIDSASRSATD=PIJLNNEAAAOKNLBLLBDAGGMP; path=/
 Cache-control: private
 
-doneb7e684e8313b5729fd1c70a3fc19e425700449f6
+done15a5ff3d835a9e893af615959c78552ac0f02909
 ```
 
 ## /get2.asp
 
-### Example (TODO)
+### Example (Mario Strikers Charged Football)
 #### Without Hash
 ```HTTP
-GET /TODO/get2.asp
+GET /mschargedwii/web/client/get2.asp?pid=355776439 HTTP/1.1
+Host: gamestats2.gs.nintendowifi.net
+User-Agent: GameSpyHTTP/1.0
+Connection: close
 ```
 ```HTTP
-HTTP/1.1 200 TODO
+HTTP/1.1 200 OK
+Date: Sun, 18 May 2014 11:45:27 GMT
+Server: Microsoft-IIS/6.0
+p3p: CP='NOI ADMa OUR STP'
+cluster-server: gstprdweb16.las1.colo.ignops.com
+X-Powered-By: ASP.NET
+Content-Length: 32
+Content-Type: text/html
+Set-Cookie: ASPSESSIONIDQARTQDSD=JMPBHIEAJJNNMLDOBKIFDFIL; path=/
+Cache-control: private
+
+KQkQRfx1anLfWgPFbAgL1hWLsKkUK8T8
 ```
 
 #### With Hash
 ```HTTP
-GET /TODO/get2.asp
+GET /mschargedwii/web/client/get2.asp?pid=355776439&hash=4e2a8b441d4caba5222639f0b1a3952dd0c1d288&data=QttiWbe3NBUcAAAABAAAAAEAAAACAAAADAAAAAEAAAAKAAAAwgIAAA== HTTP/1.1
+Host: gamestats2.gs.nintendowifi.net
+User-Agent: GameSpyHTTP/1.0
+Connection: close
 ```
 ```HTTP
-HTTP/1.1 200 TODO
+HTTP/1.1 200 OK
+Date: Sun, 18 May 2014 11:45:28 GMT
+Server: Microsoft-IIS/6.0
+p3p: CP='NOI ADMa OUR STP'
+cluster-server: gstprdweb13.las1.colo.ignops.com
+X-Powered-By: ASP.NET
+Content-Length: 1572
+Content-Type: text/html
+Set-Cookie: ASPSESSIONIDSQQQSRAS=FJPKFMEAHKEFLFCEDPCBNNEK; path=/
+Cache-control: private
+
+....
+.......I.....4................................s.e.b...U.......U.....V.s.e.b...............Q.v7w.\.. .f........@4H..0...%........................LA't`.......>).....'a.......................................?.?.?&....U.....%............&....R..;<..#.'.....H`1.(....@.I......%..r.a.f.a.e.l............S>.svz.............`.................................b...b... .m.a.r.i.o...
+.b...b... .m.a.r.i.o.....1Yp1.`-JL).(.P..A.I(...q
+.......................x....?B^%h....IH......c.................................l.i.l.i.a.n.....U.....a.l.i.l.i.a.n...o.s.s....O.YY....b.1...<..H.Mx.....%..l.i.l.i..............wC
+...T...+. .W........................................J.a.n. .G.o.l.d......
+..J.a.n. .G.o.l.d....+.....A.....D\..(....T.I......%........................u.c.O&.....b.......^.c.........a......................J.A.V.I.........U.......J.A.V.I.............L..ctA.....b@1.(....@.I..t...%.......................X..7.....D.....B......................................&..S.c.a.r.t&....U......&..S.c.a.r.t&.......@...f....v4.C.2=.h...\.M.
+....%.&..B.G&...............f|.v.L....}..Tc.....S/..
+.......v......................e.t.h.a.n. .w. &.&....!.e.t.h.a.n. .w. &.&.T1..
+.G.....>@1.(....@.Mx.....%.......................}......]..5L..5.....,...
+.......7......................g.u.-.g.u.s.....U....*a.g.u.-.g.u.s........5...c.h0....BZ..(...HD.H......%..m.a.r.i.u.s..........#...}E...:...U;.......B................................M.a.i.t.r.e.G.i.m.s.....M.a.i.t.r.e.G.i.m.s3K..5e.
+.:4.Z@1.(....@.M0.`...%........................G..0-@.O..0;.d.0551fef291adc9ca4f96469db0afa5b34911f887
 ```
+[Network dump](https://www.cloudshark.org/captures/82bb137e8990)
