@@ -19,6 +19,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import base64
+import hashlib
 from collections import namedtuple
 
 GamestatsKey = namedtuple("GamestatsKey", [
@@ -72,6 +74,13 @@ def load_keys(path):
             gamename.lower(): key_from_str(key)
             for gamename, key in helper(f)
         }
+
+
+def do_hmac(key, msg):
+    """Generate message HMAC."""
+    return hashlib.sha1(
+        key.salt + base64.urlsafe_b64encode(msg) + key.salt
+    ).hexdigest()
 
 
 if __name__ == "__main__":
