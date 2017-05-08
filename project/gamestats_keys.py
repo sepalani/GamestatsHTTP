@@ -63,7 +63,8 @@ def load_keys(path):
     def helper(f):
         """Return the gamename and the key pair list."""
         for line in f:
-            if not line or line[0] == '#' or not line.count(' '):
+            line = line.partition('#')[0]
+            if not line or not line.count(' '):
                 continue
             gamename, key = line.split(' ', 1)
             yield gamename.strip(), key.strip()
