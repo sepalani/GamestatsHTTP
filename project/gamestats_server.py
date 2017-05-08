@@ -30,19 +30,35 @@ except ImportError:
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from socketserver import ForkingMixIn, ThreadingMixIn
 
+import gamestats_keys as gs_keys
+
 
 class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
     """Gamestats HTTP request handler."""
+    def parse_path(self):
+        """Split the gamename and the path."""
+        if self.path.count("/") >= 2:
+            _, gamename, path = self.path.split("/", 2)
+            if not _:
+                return gamename, "/{}".format(path)
+        return None, self.path
+
     def do_GET(self):
-        pass
+        gamename, path = self.parse_path()
+        print("[{}] GET {}".format(gamename, path))
+        print("Key: {}".format(self.server.gamestats_keys.get(gamename, None)))
 
     def do_POST(self):
-        pass
+        gamename, path = self.parse_path()
+        print("[{}] POST {}".format(gamename, path))
+        print("Key: {}".format(self.server.gamestats_keys.get(gamename, None)))
 
 
 class GamestatsHTTPServer(HTTPServer):
     """Gamestats HTTP server."""
-    pass
+    def __init__(self, *args, **kwargs):
+        HTTPServer.__init__(self, *args, **kwargs)
+        self.gamestats_keys = gs_keys.load_keys("gamestats_keys.txt")
 
 
 class GamestatsForkingHTTPServer(ForkingMixIn, GamestatsHTTPServer):
