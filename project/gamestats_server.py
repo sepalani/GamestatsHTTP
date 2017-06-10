@@ -31,10 +31,18 @@ except ImportError:
     from socketserver import ForkingMixIn, ThreadingMixIn
 
 import gamestats_keys as gs_keys
+from routers.web import GamestatsRouter
 
 
 class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
     """Gamestats HTTP request handler."""
+    def send_headers(self):
+        """Send headers."""
+        self.send_header("Content-type", "text/html")
+        self.send_header("Server", "Microsoft-IIS/6.0")
+        self.send_header("server", "GSTPRDSTATSWEB2")
+        self.send_header("X-Powered-By", "ASP.NET")
+
     def parse_path(self):
         """Split the gamename and the path."""
         if self.path.count("/") >= 2:
@@ -47,11 +55,13 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
         gamename, path = self.parse_path()
         print("[{}] GET {}".format(gamename, path))
         print("Key: {}".format(self.server.gamestats_keys.get(gamename, None)))
+        self.server.gamestats_router.do_GET(self, gamename, path)
 
     def do_POST(self):
         gamename, path = self.parse_path()
         print("[{}] POST {}".format(gamename, path))
         print("Key: {}".format(self.server.gamestats_keys.get(gamename, None)))
+        self.server.gamestats_router.do_POST(self, gamename, path)
 
 
 class GamestatsHTTPServer(HTTPServer):
@@ -59,6 +69,7 @@ class GamestatsHTTPServer(HTTPServer):
     def __init__(self, *args, **kwargs):
         HTTPServer.__init__(self, *args, **kwargs)
         self.gamestats_keys = gs_keys.load_keys("gamestats_keys.txt")
+        self.gamestats_router = GamestatsRouter()
 
 
 class GamestatsForkingHTTPServer(ForkingMixIn, GamestatsHTTPServer):
