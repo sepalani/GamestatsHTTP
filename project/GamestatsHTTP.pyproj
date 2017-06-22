@@ -26,6 +26,9 @@
     <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="gamestats_database.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="gamestats_server.py">
       <SubType>Code</SubType>
     </Compile>

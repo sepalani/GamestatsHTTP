@@ -23,12 +23,14 @@ import random
 import string
 import urlparse
 
+import gamestats_database
 from routers import BaseRouter
 
 
 # Utils
 
 CHALLENGE_CHARSET = string.ascii_letters + string.digits
+
 
 def generate_challenge(size=32):
     """Generate challenge."""
@@ -59,10 +61,25 @@ def root_download(handler, gamename, resource):
         handler.wfile.write(generate_challenge())
         return
 
-    print("TODO - Download data: {}".format(q))
-    handler.send_response(404)
-    handler.send_headers()
-    handler.end_headers()
+    handler.log_message("Download request for {}: {}".format(gamename, q))
+    data = gamestats_database.root_download(
+        gamename,
+        q["pid"][0], q["region"][0],
+        handler.server.gamestats_db
+    )
+    handler.log_message("Downloaded data for {}: {}".format(
+        gamename, tuple(data) if data else None
+    ))
+
+    if not data:
+        handler.send_response(404)
+        handler.send_headers()
+        handler.end_headers()
+    else:
+        handler.send_response(200)
+        handler.send_headers(len(data["data"]))
+        handler.end_headers()
+        handler.wfile.write(data["data"])
 
 
 def root_upload(handler, gamename, resource):
@@ -77,7 +94,15 @@ def root_upload(handler, gamename, resource):
     length = int(handler.headers.get('content-length', 0))
     body = handler.rfile.read(length)
     q = urlparse.parse_qs(body)
-    print("TODO - Upload data: {}".format(q))
+
+    # TODO - Check the hash
+
+    handler.log_message("Upload request for {}: {}".format(gamename, q))
+    data = gamestats_database.root_upload(
+        gamename,
+        q["pid"][0], q["region"][0], q["data"][0],
+        handler.server.gamestats_db
+    )
 
     handler.send_response(200)
     handler.send_headers()
@@ -186,6 +211,7 @@ COMMANDS = {
     "GET": GENERIC_COMMANDS,
     "POST": GENERIC_COMMANDS
 }
+
 
 class GamestatsRouter(BaseRouter):
     """Gamestats router class."""

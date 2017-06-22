@@ -30,17 +30,20 @@ except ImportError:
     from http.server import BaseHTTPRequestHandler, HTTPServer
     from socketserver import ForkingMixIn, ThreadingMixIn
 
+import gamestats_database
 import gamestats_keys as gs_keys
 from routers.web import GamestatsRouter
 
 
 class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
     """Gamestats HTTP request handler."""
-    def send_headers(self):
+    def send_headers(self, length=None):
         """Send headers."""
-        self.send_header("Content-type", "text/html")
         self.send_header("Server", "Microsoft-IIS/6.0")
         self.send_header("server", "GSTPRDSTATSWEB2")
+        if length is not None:
+            self.send_header("Content-Length", length)
+        self.send_header("Content-Type", "text/html")
         self.send_header("X-Powered-By", "ASP.NET")
 
     def parse_path(self):
@@ -66,10 +69,11 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
 
 class GamestatsHTTPServer(HTTPServer):
     """Gamestats HTTP server."""
-    def __init__(self, *args, **kwargs):
+    def __init__(self, database_path, *args, **kwargs):
         HTTPServer.__init__(self, *args, **kwargs)
         self.gamestats_keys = gs_keys.load_keys("gamestats_keys.txt")
         self.gamestats_router = GamestatsRouter()
+        self.gamestats_db = database_path
 
 
 class GamestatsForkingHTTPServer(ForkingMixIn, GamestatsHTTPServer):
@@ -119,6 +123,9 @@ if __name__ == "__main__":
                       choices=("base", "fork", "thread"),
                       default="base", dest="type",
                       help="set server type")
+    parser.add_option("-d", "--database", action="store", type=str,
+                      default=gamestats_database.DATABASE_PATH, dest="db",
+                      help="set server database path")
     opt, arg = parser.parse_args()
 
     server_classes = {
@@ -127,7 +134,11 @@ if __name__ == "__main__":
         "thread": GamestatsThreadingHTTPServer
     }
 
+    # Init database
+    gamestats_database.init(opt.db)
+
     server = server_classes[opt.type](
+        opt.db,
         (opt.host, opt.port),
         GamestatsHTTPRequestHandler
     )
