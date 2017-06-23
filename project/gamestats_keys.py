@@ -33,6 +33,10 @@ GamestatsKeyConstants = namedtuple("GamestatsKeyConstants", [
     "z",
     "checksum_secret"
 ])
+DUMMY_GAMESTATS_KEY = GamestatsKey(
+    "00000000000000000000",
+    GamestatsKeyConstants(x=0, y=0, z=0, checksum_secret=0)
+)
 
 
 def key_constants_from_str(s):

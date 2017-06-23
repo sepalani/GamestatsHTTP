@@ -19,11 +19,14 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import base64
 import random
 import string
+import struct
 import urlparse
 
 import gamestats_database
+import gamestats_keys
 from routers import BaseRouter
 
 
@@ -124,7 +127,74 @@ def client_get2(handler, gamename, resource):
 
 
 def client_put2(handler, gamename, resource):
-    pass
+    """GET /web/client/put2.asp route.
+
+    Format (query string): /put2.asp?pid=%s&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)
+     - data: Base64 urlsafe encoded data to upload
+
+    Example (data base64 urlsafe decoded):
+    0000  42 db 44 0f b7 b7 34 15  90 00 00 00 04 00 00 00  |B.D...4.........|
+    0010  02 00 00 00 10 00 00 00  80 00 00 00 12 05 07 de  |................|
+    0020  00 00 00 01 00 00 00 02  00 02 00 73 00 65 00 62  |...........s.e.b|
+    0030  00 00 ff 55 fd c8 fb c3  00 aa ff 55 fd c8 fb e3  |...U.......U....|
+    0040  a8 56 00 73 00 65 00 62  00 00 00 00 00 00 00 00  |.V.s.e.b........|
+    0050  00 00 00 00 00 00 7f 51  80 76 37 77 c2 5c b9 90  |.......Q.v7w.\..|
+    0060  20 0c 66 00 01 96 08 a2  08 8c 08 40 34 48 98 8d  | .f........@4H..|
+    0070  30 8a 00 8a 25 05 00 00  00 00 00 00 00 00 00 00  |0...%...........|
+    0080  00 00 00 00 00 00 00 00  00 00 96 f7 83 4c 41 27  |.............LA'|
+    0090  74 60 82 12 15 f9 c0 c7  a4 3e 29 b6              |t`.......>).|
+    009c
+
+    Description:
+    42 db 44 0f - Checksum
+    b7 b7 34 15 - Player ID
+    90 00 00 00 - Packet size
+    04 00 00 00 - Region
+    02 00 00 00 - Category
+    10 00 00 00 - Score
+    80 00 00 00 - Player data size
+    [...]       - Player data
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if not q.get("hash", []):
+        challenge = generate_challenge()
+        handler.send_response(200)
+        handler.send_headers(len(challenge))
+        handler.end_headers()
+        handler.wfile.write(challenge)
+        return
+
+    handler.log_message("Put2 request for {}: {}".format(gamename, q))
+    data = base64.urlsafe_b64decode(q["data"][0])
+    checksum, pid, packet_len, region, category, score, player_data_size = \
+        struct.unpack_from("<IIIIIII", data)
+
+    # TODO - Check sizes and checksum
+    player_data = data[28:28+player_data_size]
+    gamestats_database.web_put2(
+        gamename,
+        pid, region, category, score, player_data,
+        handler.server.gamestats_db
+    )
+
+    # Generate response
+    key = handler.server.gamestats_keys.get(gamename, "")
+    if not key or not key.salt:
+        handler.log_message("Missing gamestats secret salt for {}".format(
+            gamename
+        ))
+        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    message = b"done"
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_response(200)
+    handler.send_headers(len(message))
+    handler.end_headers()
+    handler.wfile.write(message)
 
 
 # Super Smash Bros. Brawl

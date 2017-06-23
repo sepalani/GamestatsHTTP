@@ -37,11 +37,15 @@ def init(path=DATABASE_PATH):
     c.execute("CREATE TABLE IF NOT EXISTS storage"
               " (gamename TEXT, pid INT, region TEXT, data TEXT,"
               " updated DATETIME)")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_storage"
+              " ON storage (gamename, pid, region)")
 
     # Gamestats2
     c.execute("CREATE TABLE IF NOT EXISTS ranking"
               " (gamename TEXT, pid INT, region INT, category INT,"
               " score INT, data TEXT, updated DATETIME)")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_ranking"
+              " ON ranking (gamename, pid, region, category)")
 
     conn.commit()
     conn.close()
@@ -53,6 +57,7 @@ class GamestatsDatabase(object):
         self.path = path
         self.conn = sqlite3.connect(self.path, timeout=DATABASE_TIMEOUT)
         self.conn.row_factory = sqlite3.Row
+        self.conn.text_factory = bytes
 
     def __enter__(self):
         return self
@@ -75,8 +80,16 @@ class GamestatsDatabase(object):
     def root_upload(self, gamename, pid, region, data):
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
-                "INSERT INTO storage VALUES (?,?,?,?,?)",
+                "INSERT OR REPLACE INTO storage VALUES (?,?,?,?,?)",
                 (gamename, pid, region, data, datetime.now())
+            )
+        self.conn.commit()
+
+    def web_put2(self, gamename, pid, region, category, score, data):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "INSERT OR REPLACE INTO ranking VALUES (?,?,?,?,?,?,?)",
+                (gamename, pid, region, category, score, data, datetime.now())
             )
         self.conn.commit()
 
@@ -89,6 +102,12 @@ def root_download(gamename, pid, region, db_path=DATABASE_PATH):
 def root_upload(gamename, pid, region, data, db_path=DATABASE_PATH):
     with GamestatsDatabase(db_path) as db:
         return db.root_upload(gamename, pid, region, data)
+
+
+def web_put2(gamename, pid, region, category, score, data,
+             db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.web_put2(gamename, pid, region, category, score, data)
 
 
 if __name__ == "__main__":
