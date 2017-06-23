@@ -21,6 +21,7 @@
 
 import base64
 import hashlib
+import struct
 from collections import namedtuple
 
 GamestatsKey = namedtuple("GamestatsKey", [
@@ -85,6 +86,12 @@ def do_hmac(key, msg):
     return hashlib.sha1(
         key.salt + base64.urlsafe_b64encode(msg) + key.salt
     ).hexdigest()
+
+
+def do_checksum(key, data):
+    """Generate data checksum."""
+    checksum = sum(bytearray(data)) ^ key.constants.checksum_secret
+    return struct.unpack("<I", struct.pack(">I", checksum))[0]
 
 
 if __name__ == "__main__":
