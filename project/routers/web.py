@@ -123,7 +123,53 @@ def client_put(handler, gamename, resource):
 
 
 def client_get2(handler, gamename, resource):
-    pass
+    """GET /web/client/get2.asp route.
+
+    Format (query string): /get2.asp?pid=%s&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)
+     - data: Base64 urlsafe encoded data to upload
+
+    Example (data base64 urlsafe decoded):
+    TODO
+
+    Description:
+    TODO
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if not q.get("hash", []):
+        challenge = generate_challenge()
+        handler.send_response(200)
+        handler.send_headers(len(challenge))
+        handler.end_headers()
+        handler.wfile.write(challenge)
+        return
+
+    handler.log_message("Get2 request for {}: {}".format(gamename, q))
+    data = base64.urlsafe_b64decode(q["data"][0])
+    checksum, pid, packet_len, region, category, mode, player_data_size = \
+        struct.unpack_from("<IIIIIII", data)
+
+    # Dummy response
+    row_count = 0
+    unknown_0x08 = 0
+    message = struct.pack("<III", mode, row_count, unknown_0x08)
+
+    # Generate response
+    key = handler.server.gamestats_keys.get(gamename, "")
+    if not key or not key.salt:
+        handler.log_message("Missing gamestats secret salt for {}".format(
+            gamename
+        ))
+        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_response(200)
+    handler.send_headers(len(message))
+    handler.end_headers()
+    handler.wfile.write(message)
 
 
 def client_put2(handler, gamename, resource):
