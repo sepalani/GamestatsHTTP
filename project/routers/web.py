@@ -112,6 +112,34 @@ def root_upload(handler, gamename, resource):
     handler.end_headers()
 
 
+def root_store(handler, gamename, resource):
+    """GET /store.asp route.
+
+    Format (query string): /store.asp?pid=%s&name=%s&data=%s&hash=%s&region=%s
+     - pid: Player ID
+     - name: Player name
+     - data: Data to store
+     - hash: ???
+     - region: Game region
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if not q.get("hash", []):
+        handler.send_response(200)
+        handler.send_headers()
+        handler.end_headers()
+        handler.wfile.write(generate_challenge())
+        return
+
+    # TODO - Implement it properly
+    handler.log_message("Dummy store request for {}: {}".format(gamename, q))
+    handler.send_response(200)
+    handler.send_headers(0)
+    handler.end_headers()
+
+
 # Gamestats2
 
 def client_get(handler, gamename, resource):
@@ -285,7 +313,8 @@ def handle_root(handler, gamename, resource):
     """Handle / routes."""
     return handle(handler, gamename, resource, {
         "download.asp": root_download,
-        "upload.asp": root_upload
+        "upload.asp": root_upload,
+        "store.asp": root_store
     })
 
 
