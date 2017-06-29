@@ -28,6 +28,13 @@ DATABASE_PATH = "gamestats2.db"
 DATABASE_TIMEOUT = 5.0
 
 
+def dict_factory(cursor, row):
+    d = {}
+    for idx, col in enumerate(cursor.description):
+        d[col[0]] = row[idx]
+    return d
+
+
 def init(path=DATABASE_PATH):
     """Initialize Gamestats database."""
     conn = sqlite3.connect(path, timeout=DATABASE_TIMEOUT)
@@ -51,12 +58,25 @@ def init(path=DATABASE_PATH):
     conn.close()
 
 
+def get2_dictrow(gamename, pid, region, category,
+                 score=0, data=b"", updated=0):
+    return {
+        "gamename": gamename,
+        "pid": pid,
+        "region": region,
+        "category": category,
+        "score": score,
+        "data": data,
+        "updated": updated
+    }
+
+
 class GamestatsDatabase(object):
     """Gamestats database class."""
     def __init__(self, path=DATABASE_PATH):
         self.path = path
         self.conn = sqlite3.connect(self.path, timeout=DATABASE_TIMEOUT)
-        self.conn.row_factory = sqlite3.Row
+        self.conn.row_factory = dict_factory
         self.conn.text_factory = bytes
 
     def __enter__(self):
@@ -93,6 +113,76 @@ class GamestatsDatabase(object):
             )
         self.conn.commit()
 
+    def web_get2_own(self, gamename, pid, region, category, data):
+        with closing(self.conn.cursor()) as cursor:
+            # TODO
+            return []
+
+    def web_get2_top(self, gamename, pid, region, category, data):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " ORDER BY score ASC LIMIT ?",
+                (gamename, region, category, data.get("limit", 10))
+            )
+            return cursor.fetchall()
+
+    def web_get2_nearby(self, gamename, pid, region, category, data):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " AND pid = ?",
+                (gamename, region, category, pid)
+            )
+            mine = cursor.fetchone()
+            if not mine:
+                mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " AND pid != ?"
+                " ORDER BY ABS(? - score) ASC LIMIT ?",
+                (gamename, region, category, pid, mine["score"],
+                 data.get("limit", 10) - 1)
+            )
+            others = cursor.fetchall()
+            return [mine] + others
+
+    def web_get2_friends(self, gamename, pid, region, category, data):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " AND pid = ?",
+                (gamename, region, category, pid)
+            )
+            mine = cursor.fetchone()
+            if not mine:
+                mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " AND pid IN ({}) LIMIT ?".format(
+                    ", ".join("{}".format(i) for i in data.get("friends", []))
+                ),
+                (gamename, region, category, data.get("limit", 10) - 1)
+            )
+            friends = cursor.fetchall()
+            return [mine] + friends
+
+    def web_get2(self, gamename, pid, region, category, mode, data):
+        if mode == 0:
+            return self.web_get2_own(gamename, pid, region, category, data)
+        elif mode == 1:
+            return self.web_get2_top(gamename, pid, region, category, data)
+        elif mode == 2:
+            return self.web_get2_nearby(gamename, pid, region, category, data)
+        elif mode == 3:
+            return self.web_get2_friends(gamename, pid, region, category, data)
+        raise ValueError("Unknown get2 mode: {}".format(mode))
+
 
 def root_download(gamename, pid, region, db_path=DATABASE_PATH):
     with GamestatsDatabase(db_path) as db:
@@ -108,6 +198,12 @@ def web_put2(gamename, pid, region, category, score, data,
              db_path=DATABASE_PATH):
     with GamestatsDatabase(db_path) as db:
         return db.web_put2(gamename, pid, region, category, score, data)
+
+
+def web_get2(gamename, pid, region, category, mode, data,
+             db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.web_get2(gamename, pid, region, category, mode, data)
 
 
 if __name__ == "__main__":

@@ -178,13 +178,39 @@ def client_get2(handler, gamename, resource):
 
     handler.log_message("Get2 request for {}: {}".format(gamename, q))
     data = base64.urlsafe_b64decode(q["data"][0])
-    checksum, pid, packet_len, region, category, mode, player_data_size = \
+    checksum, pid, packet_len, region, category, mode, mode_data_size = \
         struct.unpack_from("<IIIIIII", data)
+    mode_data = data[28:28+mode_data_size]
+    parsed_data = {}
+    if len(mode_data) >= 4:
+        parsed_data["filter"] = struct.unpack_from("<I", mode_data, 0)[0]
+    if len(mode_data) >= 8:
+        parsed_data["limit"] = struct.unpack_from("<I", mode_data, 4)[0]
+    if len(mode_data) >= 12:
+        parsed_data["updated"] = struct.unpack_from("<I", mode_data, 8)[0]
+    if len(mode_data) >= 268:
+        parsed_data["friends"] = set(
+            struct.unpack_from("<" + 64*"I", mode_data, 12)
+        )
+        if 0 in parsed_data["friends"]:
+            parsed_data["friends"].remove(0)
 
-    # Dummy response
-    row_count = 0
-    unknown_0x08 = 0
-    message = struct.pack("<III", mode, row_count, unknown_0x08)
+    # Get rows
+    rows = gamestats_database.web_get2(
+        gamename, pid, region, category, mode, parsed_data,
+        handler.server.gamestats_db
+    )
+    row_count = len(rows)
+    row_total = row_count  # Fake it, FTM
+    if mode == 2 or mode == 3:
+        row_total -= 1
+    message = struct.pack("<III", mode, row_count, row_total)
+    for row in rows:
+        message += struct.pack(
+            "<IIIIII",
+            0, row["pid"], row["score"], row["region"], 0, len(row["data"])
+        )
+        message += row["data"]
 
     # Generate response
     key = handler.server.gamestats_keys.get(gamename, "")
