@@ -290,7 +290,7 @@ def client_put2(handler, gamename, resource):
         struct.unpack_from("<IIIIIII", data)
 
     # TODO - Check sizes and checksum
-    player_data = data[28:28+player_data_size]
+    player_data = bytes(data[28:28+player_data_size])
     gamestats_database.web_put2(
         gamename,
         pid, region, category, score, player_data,
