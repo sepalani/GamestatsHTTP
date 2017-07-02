@@ -94,5 +94,22 @@ def do_checksum(key, data):
     return struct.unpack("<I", struct.pack(">I", checksum))[0]
 
 
+def xor_data(key, data):
+    """Encrypt/Decrypt data.
+
+    Thanks to mm201:
+    https://github.com/mm201/pkmn-classic-framework/wiki/gamestats2-server
+    """
+    data = bytearray(data)
+    checksum = struct.unpack_from(">I", data, 0)[0]
+    x, y, z, checksum_secret = key.constants
+    seed = checksum ^ checksum_secret
+    seed = (seed | seed << 16) & 0xFFFFFFFF
+    for i in range(len(data) - 4):
+        seed = (seed * x + y) & ~z
+        data[4 + i] ^= (seed >> 16) & 0xFF
+    return data
+
+
 if __name__ == "__main__":
     pass

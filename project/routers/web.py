@@ -43,6 +43,19 @@ def generate_challenge(size=32):
     )
 
 
+def decrypt_data(data, pid, key):
+    """Decrypt data."""
+    data_pid = struct.unpack_from("<I", data, 4)[0]
+    if data_pid != pid:
+        return gamestats_keys.xor_data(key, data)
+    return bytearray(data)
+
+
+def decode_data(data, pid, key):
+    """Decode data."""
+    return decrypt_data(base64.urlsafe_b64decode(data), pid, key)
+
+
 # Gamestats
 
 def root_download(handler, gamename, resource):
@@ -177,7 +190,11 @@ def client_get2(handler, gamename, resource):
         return
 
     handler.log_message("Get2 request for {}: {}".format(gamename, q))
-    data = base64.urlsafe_b64decode(q["data"][0])
+    key = handler.server.gamestats_keys.get(gamename, None)
+    if not key:
+        handler.log_message("Missing gamestats secret for {}".format(gamename))
+        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, region, category, mode, mode_data_size = \
         struct.unpack_from("<IIIIIII", data)
     mode_data = data[28:28+mode_data_size]
@@ -213,12 +230,6 @@ def client_get2(handler, gamename, resource):
         message += row["data"]
 
     # Generate response
-    key = handler.server.gamestats_keys.get(gamename, "")
-    if not key or not key.salt:
-        handler.log_message("Missing gamestats secret salt for {}".format(
-            gamename
-        ))
-        key = gamestats_keys.DUMMY_GAMESTATS_KEY
     message += gamestats_keys.do_hmac(key, message)
     handler.send_response(200)
     handler.send_headers(len(message))
@@ -270,7 +281,11 @@ def client_put2(handler, gamename, resource):
         return
 
     handler.log_message("Put2 request for {}: {}".format(gamename, q))
-    data = base64.urlsafe_b64decode(q["data"][0])
+    key = handler.server.gamestats_keys.get(gamename, None)
+    if not key:
+        handler.log_message("Missing gamestats secret for {}".format(gamename))
+        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, region, category, score, player_data_size = \
         struct.unpack_from("<IIIIIII", data)
 
