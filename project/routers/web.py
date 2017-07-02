@@ -48,6 +48,17 @@ def generate_challenge(size=32):
     )
 
 
+def require_challenge(q, handler):
+    """Send a challenge if required."""
+    if not q.get("hash", []):
+        handler.send_response(200)
+        handler.send_headers()
+        handler.end_headers()
+        handler.wfile.write(generate_challenge())
+        return True
+    return False
+
+
 def decrypt_data(data, pid, key):
     """Decrypt data."""
     data_pid = struct.unpack_from("<I", data, 4)[0]
@@ -75,11 +86,7 @@ def root_download(handler, gamename, resource):
     q = urlparse.parse_qs(qs)
 
     # Generate challenge
-    if not q.get("hash", []):
-        handler.send_response(200)
-        handler.send_headers()
-        handler.end_headers()
-        handler.wfile.write(generate_challenge())
+    if require_challenge(q, handler):
         return
 
     handler.log_message("Download request for {}: {}".format(gamename, q))
@@ -144,11 +151,7 @@ def root_store(handler, gamename, resource):
     q = urlparse.parse_qs(qs)
 
     # Generate challenge
-    if not q.get("hash", []):
-        handler.send_response(200)
-        handler.send_headers()
-        handler.end_headers()
-        handler.wfile.write(generate_challenge())
+    if require_challenge(q, handler):
         return
 
     # TODO - Implement it properly
@@ -176,12 +179,7 @@ def client_get(handler, gamename, resource):
     q = urlparse.parse_qs(qs)
 
     # Generate challenge
-    if not q.get("hash", []):
-        challenge = generate_challenge()
-        handler.send_response(200)
-        handler.send_headers(len(challenge))
-        handler.end_headers()
-        handler.wfile.write(challenge)
+    if require_challenge(q, handler):
         return
 
     # TODO
@@ -204,12 +202,7 @@ def client_put(handler, gamename, resource):
     q = urlparse.parse_qs(qs)
 
     # Generate challenge
-    if not q.get("hash", []):
-        challenge = generate_challenge()
-        handler.send_response(200)
-        handler.send_headers(len(challenge))
-        handler.end_headers()
-        handler.wfile.write(challenge)
+    if require_challenge(q, handler):
         return
 
     # TODO
@@ -234,12 +227,7 @@ def client_get2(handler, gamename, resource):
     q = urlparse.parse_qs(qs)
 
     # Generate challenge
-    if not q.get("hash", []):
-        challenge = generate_challenge()
-        handler.send_response(200)
-        handler.send_headers(len(challenge))
-        handler.end_headers()
-        handler.wfile.write(challenge)
+    if require_challenge(q, handler):
         return
 
     handler.log_message("Get2 request for {}: {}".format(gamename, q))
@@ -325,12 +313,7 @@ def client_put2(handler, gamename, resource):
     q = urlparse.parse_qs(qs)
 
     # Generate challenge
-    if not q.get("hash", []):
-        challenge = generate_challenge()
-        handler.send_response(200)
-        handler.send_headers(len(challenge))
-        handler.end_headers()
-        handler.wfile.write(challenge)
+    if require_challenge(q, handler):
         return
 
     handler.log_message("Put2 request for {}: {}".format(gamename, q))
