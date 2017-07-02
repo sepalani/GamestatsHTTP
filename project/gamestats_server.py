@@ -51,7 +51,7 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
         if self.path.count("/") >= 2:
             _, gamename, path = self.path.split("/", 2)
             if not _:
-                return gamename, "/{}".format(path)
+                return gamename.lower(), "/{}".format(path)
         return None, self.path
 
     def do_GET(self):
