@@ -161,11 +161,59 @@ def root_store(handler, gamename, resource):
 # Gamestats2
 
 def client_get(handler, gamename, resource):
-    pass
+    """GET /web/client/get.asp route.
+
+    Format (query string): /get.asp?pid=%s&hash=%s&data=%s
+    TODO
+
+    Example (data base64 urlsafe decoded):
+    TODO
+
+    Description:
+    TODO
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if not q.get("hash", []):
+        challenge = generate_challenge()
+        handler.send_response(200)
+        handler.send_headers(len(challenge))
+        handler.end_headers()
+        handler.wfile.write(challenge)
+        return
+
+    # TODO
+    return
 
 
 def client_put(handler, gamename, resource):
-    pass
+    """GET /web/client/put.asp route.
+
+    Format (query string): /put.asp?pid=%s&hash=%s&data=%s
+    TODO
+
+    Example (data base64 urlsafe decoded):
+    TODO
+
+    Description:
+    TODO
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if not q.get("hash", []):
+        challenge = generate_challenge()
+        handler.send_response(200)
+        handler.send_headers(len(challenge))
+        handler.end_headers()
+        handler.wfile.write(challenge)
+        return
+
+    # TODO
+    return
 
 
 def client_get2(handler, gamename, resource):
