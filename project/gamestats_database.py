@@ -115,8 +115,17 @@ class GamestatsDatabase(object):
 
     def web_get2_own(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
-            # TODO
-            return []
+            limit = ''
+            parameters = (gamename, region, category)
+            if data.get("limit", 0):
+                limit = " LIMIT ?"
+                parameters = parameters + (data["limit"],)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " ORDER BY score ASC" + limit, parameters
+            )
+            return cursor.fetchall()
 
     def web_get2_top(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
