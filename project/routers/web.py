@@ -23,7 +23,12 @@ import base64
 import random
 import string
 import struct
-import urlparse
+try:
+    # Python 2
+    import urlparse
+except ImportError:
+    # Python 3
+    import urllib.parse as urlparse
 
 import gamestats_database
 import gamestats_keys

@@ -23,12 +23,12 @@ from optparse import OptionParser
 
 try:
     # Python 2
+    import SocketServer
     from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
-    from SocketServer import ForkingMixIn, ThreadingMixIn
 except ImportError:
     # Python 3
+    import socketserver as SocketServer
     from http.server import BaseHTTPRequestHandler, HTTPServer
-    from socketserver import ForkingMixIn, ThreadingMixIn
 
 import gamestats_database
 import gamestats_keys as gs_keys
@@ -76,12 +76,15 @@ class GamestatsHTTPServer(HTTPServer):
         self.gamestats_db = database_path
 
 
-class GamestatsForkingHTTPServer(ForkingMixIn, GamestatsHTTPServer):
-    """Gamestats forking HTTP server."""
-    pass
+if hasattr(SocketServer, "ForkingMixIn"):
+    class GamestatsForkingHTTPServer(SocketServer.ForkingMixIn,
+                                     GamestatsHTTPServer):
+        """Gamestats forking HTTP server."""
+        pass
 
 
-class GamestatsThreadingHTTPServer(ThreadingMixIn, GamestatsHTTPServer):
+class GamestatsThreadingHTTPServer(SocketServer.ThreadingMixIn,
+                                   GamestatsHTTPServer):
     """Gamestats threading HTTP server."""
     pass
 
@@ -106,6 +109,17 @@ def ssl_wrapper(opt, server):
 
 
 if __name__ == "__main__":
+    # Server classes
+    server_classes = {
+        "base": GamestatsHTTPServer,
+        "thread": GamestatsThreadingHTTPServer
+    }
+    choices = ("base", "thread")
+    if hasattr(SocketServer, "ForkingMixIn"):
+        choices = choices + ("fork",)
+        server_classes["fork"] = GamestatsForkingHTTPServer
+
+    # Option parser
     parser = OptionParser()
     parser.add_option("-H", "--hostname", action="store", type=str,
                       default="0.0.0.0", dest="host",
@@ -120,19 +134,13 @@ if __name__ == "__main__":
                       default="", dest="key",
                       help="set HTTPS server private key")
     parser.add_option("-t", "--type", action="store", type="choice",
-                      choices=("base", "fork", "thread"),
+                      choices=choices,
                       default="base", dest="type",
                       help="set server type")
     parser.add_option("-d", "--database", action="store", type=str,
                       default=gamestats_database.DATABASE_PATH, dest="db",
                       help="set server database path")
     opt, arg = parser.parse_args()
-
-    server_classes = {
-        "base": GamestatsHTTPServer,
-        "fork": GamestatsForkingHTTPServer,
-        "thread": GamestatsThreadingHTTPServer
-    }
 
     # Init database
     gamestats_database.init(opt.db)

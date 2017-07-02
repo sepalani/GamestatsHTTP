@@ -35,7 +35,7 @@ GamestatsKeyConstants = namedtuple("GamestatsKeyConstants", [
     "checksum_secret"
 ])
 DUMMY_GAMESTATS_KEY = GamestatsKey(
-    "00000000000000000000",
+    b"00000000000000000000",
     GamestatsKeyConstants(x=0, y=0, z=0, checksum_secret=0)
 )
 
@@ -68,13 +68,13 @@ def load_keys(path):
     def helper(f):
         """Return the gamename and the key pair list."""
         for line in f:
-            if not line or line[0] == '#' or not line.count(' '):
+            if not line or line[0] == b'#' or not line.count(b' '):
                 continue
-            gamename, key = line.split(' ', 1)
-            yield gamename.strip(), key.strip()
+            gamename, key = line.split(b' ', 1)
+            yield gamename.strip().decode("ascii"), key.strip()
         return
 
-    with open(path, "r") as f:
+    with open(path, "rb") as f:
         return {
             gamename.lower(): key_from_str(key)
             for gamename, key in helper(f)
@@ -85,7 +85,7 @@ def do_hmac(key, msg):
     """Generate message HMAC."""
     return hashlib.sha1(
         key.salt + base64.urlsafe_b64encode(msg) + key.salt
-    ).hexdigest()
+    ).hexdigest().encode("ascii")
 
 
 def do_checksum(key, data):
