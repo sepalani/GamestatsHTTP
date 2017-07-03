@@ -190,13 +190,21 @@ def client_put(handler, gamename, resource):
     """GET /web/client/put.asp route.
 
     Format (query string): /put.asp?pid=%s&hash=%s&data=%s
-    TODO
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)?
+     - data: Base64 urlsafe encoded data to upload
 
     Example (data base64 urlsafe decoded):
-    TODO
+    0000  40 1f 41 89 26 3c c7 23  04 00 00 00 03 00 00 00  |@.A.&<.#........|
+    0010  50 0c 00 00 00 00 00 00                           |P.......|
 
     Description:
-    TODO
+    40 1f 41 89 - Checksum
+    26 3c c7 23 - Player ID
+    04 00 00 00 - Region
+    03 00 00 00 - ??? (Category?)
+    50 0c 00 00 - Score
+    00 00 00 00 - ??? (Player data size?)
     """
     qs = urlparse.urlparse(resource).query
     q = urlparse.parse_qs(qs)
@@ -205,8 +213,21 @@ def client_put(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    # TODO
-    return
+    # TODO - Implement put.asp
+
+    # Generate response
+    key = handler.server.gamestats_keys.get(gamename, "")
+    if not key or not key.salt:
+        handler.log_message("Missing gamestats secret salt for {}".format(
+            gamename
+        ))
+        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    message = b"done"
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_response(200)
+    handler.send_headers(len(message))
+    handler.end_headers()
+    handler.wfile.write(message)
 
 
 def client_get2(handler, gamename, resource):
