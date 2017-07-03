@@ -115,14 +115,23 @@ class GamestatsDatabase(object):
 
     def web_get2_own(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
-            # TODO
-            return []
+            limit = ''
+            parameters = (gamename, region, category)
+            if data.get("limit", 0):
+                limit = " LIMIT ?"
+                parameters = parameters + (data["limit"],)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " ORDER BY score ASC" + limit, parameters
+            )
+            return cursor.fetchall()
 
     def web_get2_top(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region = ? AND category = ?"
+                " WHERE gamename = ? AND region & ? AND category = ?"
                 " ORDER BY score ASC LIMIT ?",
                 (gamename, region, category, data.get("limit", 10))
             )
@@ -132,7 +141,7 @@ class GamestatsDatabase(object):
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region = ? AND category = ?"
+                " WHERE gamename = ? AND region & ? AND category = ?"
                 " AND pid = ?",
                 (gamename, region, category, pid)
             )
@@ -141,7 +150,7 @@ class GamestatsDatabase(object):
                 mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region = ? AND category = ?"
+                " WHERE gamename = ? AND region & ? AND category = ?"
                 " AND pid != ?"
                 " ORDER BY ABS(? - score) ASC LIMIT ?",
                 (gamename, region, category, pid, mine["score"],
@@ -154,7 +163,7 @@ class GamestatsDatabase(object):
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region = ? AND category = ?"
+                " WHERE gamename = ? AND region & ? AND category = ?"
                 " AND pid = ?",
                 (gamename, region, category, pid)
             )
