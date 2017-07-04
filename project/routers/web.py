@@ -187,10 +187,7 @@ def client_get(handler, gamename, resource):
 
     # TODO - Implement get.asp
     handler.log_message("Dummy get request for {}: {}".format(gamename, q))
-    key = handler.server.gamestats_keys.get(gamename, None)
-    if not key:
-        handler.log_message("Missing gamestats secret for {}".format(gamename))
-        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, region, category, mode, mode_data_size = \
         struct.unpack_from("<IIIIII", data)
@@ -245,14 +242,10 @@ def client_put(handler, gamename, resource):
         return
 
     # TODO - Implement put.asp
+    handler.log_message("Dummy put request for {}: {}".format(gamename, q))
+    key = handler.get_gamekey(gamename)
 
     # Generate response
-    key = handler.server.gamestats_keys.get(gamename, "")
-    if not key or not key.salt:
-        handler.log_message("Missing gamestats secret salt for {}".format(
-            gamename
-        ))
-        key = gamestats_keys.DUMMY_GAMESTATS_KEY
     message = b"done"
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
@@ -280,10 +273,7 @@ def client_get2(handler, gamename, resource):
         return
 
     handler.log_message("Get2 request for {}: {}".format(gamename, q))
-    key = handler.server.gamestats_keys.get(gamename, None)
-    if not key:
-        handler.log_message("Missing gamestats secret for {}".format(gamename))
-        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, region, category, mode, mode_data_size = \
         struct.unpack_from("<IIIIIII", data)
@@ -364,10 +354,7 @@ def client_put2(handler, gamename, resource):
         return
 
     handler.log_message("Put2 request for {}: {}".format(gamename, q))
-    key = handler.server.gamestats_keys.get(gamename, None)
-    if not key:
-        handler.log_message("Missing gamestats secret for {}".format(gamename))
-        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, region, category, score, player_data_size = \
         struct.unpack_from("<IIIIIII", data)
@@ -381,12 +368,6 @@ def client_put2(handler, gamename, resource):
     )
 
     # Generate response
-    key = handler.server.gamestats_keys.get(gamename, "")
-    if not key or not key.salt:
-        handler.log_message("Missing gamestats secret salt for {}".format(
-            gamename
-        ))
-        key = gamestats_keys.DUMMY_GAMESTATS_KEY
     message = b"done"
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)

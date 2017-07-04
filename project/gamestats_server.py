@@ -50,6 +50,16 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
         if message:
             self.wfile.write(message)
 
+    def get_gamekey(self, gamename):
+        """Get game key."""
+        key = self.server.gamestats_keys.get(gamename, "")
+        if not key:
+            self.log_message(
+                "Missing gamestats secret for {}".format(gamename)
+            )
+            key = gs_keys.DUMMY_GAMESTATS_KEY
+        return key
+
     def parse_path(self):
         """Split the gamename and the path."""
         if self.path.count("/") >= 2:
