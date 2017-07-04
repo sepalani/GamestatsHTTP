@@ -330,10 +330,11 @@ def client_get2(handler, gamename, resource):
     if mode in [2, 3, 4, 5]:
         row_total -= 1
     message = struct.pack("<III", mode, row_count, row_total)
-    for row in rows:
+    for order, row in enumerate(rows):
         message += struct.pack(
             "<IIIIII",
-            0, row["pid"], row["score"], row["region"], 0, len(row["data"])
+            order + 1,  # Fake the order, FTM
+            row["pid"], row["score"], row["region"], 0, len(row["data"])
         )
         message += row["data"]
 
