@@ -170,10 +170,25 @@ def client_get(handler, gamename, resource):
     TODO
 
     Example (data base64 urlsafe decoded):
-    TODO
+     - Mode 0x02 (nearby)?
+    0000  19 75 04 cf 0f 8f 93 1c  ff 00 00 00 00 00 00 00  |.u..............|
+    0010  02 00 00 00 0c 00 00 00  01 00 00 00 0a 00 00 00  |................|
+    0020  00 00 00 00                                       |....|
+     - Mode 0x01 (top)?
+    0000  19 75 05 66 0f 8f 93 1c  ff 00 00 00 00 00 00 00 |.u.f............|
+    0010  01 00 00 00 0c 00 00 00  01 00 00 00 0a 00 00 00 |................|
+    0020  c0 a8 00 00                                      |....|
 
     Description:
-    TODO
+    19 75 04 cf - Checksum
+    0f 8f 93 1c - Player ID
+    ff 00 00 00 - Region mask
+    00 00 00 00 - ??? (Category?)
+    02 00 00 00 - Get mode
+    0c 00 00 00 - Get mode data size
+    01 00 00 00 - Row filter
+    0a 00 00 00 - Row limit
+    00 00 00 00 - Time filter
     """
     qs = urlparse.urlparse(resource).query
     q = urlparse.parse_qs(qs)
@@ -182,7 +197,38 @@ def client_get(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    # TODO
+    # TODO - Implement get.asp
+    handler.log_message("Dummy get request for {}: {}".format(gamename, q))
+    key = handler.server.gamestats_keys.get(gamename, None)
+    if not key:
+        handler.log_message("Missing gamestats secret for {}".format(gamename))
+        key = gamestats_keys.DUMMY_GAMESTATS_KEY
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
+    checksum, pid, region, category, mode, mode_data_size = \
+        struct.unpack_from("<IIIIII", data)
+
+    # Get rows
+    if mode == 2 or mode == 3:
+        rows = [gamestats_database.get2_dictrow(gamename, pid, 0xFFFFFFFF, 0)]
+        row_count = 1
+    else:
+        rows = []
+        row_count = 0
+    row_total = 0
+    message = struct.pack("<III", mode, row_count, row_total)
+    for row in rows:
+        message += struct.pack(
+            "<IIIIII",
+            0, row["pid"], row["score"], row["region"], 0, len(row["data"])
+        )
+        message += row["data"]
+
+    # Generate response
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_response(200)
+    handler.send_headers(len(message))
+    handler.end_headers()
+    handler.wfile.write(message)
     return
 
 
