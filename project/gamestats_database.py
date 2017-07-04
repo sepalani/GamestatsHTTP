@@ -22,7 +22,7 @@
 import sqlite3
 
 from contextlib import closing
-from datetime import datetime
+from datetime import datetime, timedelta
 
 DATABASE_PATH = "gamestats2.db"
 DATABASE_TIMEOUT = 5.0
@@ -116,14 +116,14 @@ class GamestatsDatabase(object):
     def web_get2_own(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
             limit = ''
-            parameters = (gamename, region, category)
+            parameters = (gamename, region, category, data["since"])
             if data.get("limit", 0):
                 limit = " LIMIT ?"
                 parameters = parameters + (data["limit"],)
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " ORDER BY score ASC" + limit, parameters
+                " AND updated >= ? ORDER BY score ASC" + limit, parameters
             )
             return cursor.fetchall()
 
@@ -132,8 +132,9 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " ORDER BY score ASC LIMIT ?",
-                (gamename, region, category, data.get("limit", 10))
+                " AND updated >= ? ORDER BY score ASC LIMIT ?",
+                (gamename, region, category,
+                 data["since"], data.get("limit", 10))
             )
             return cursor.fetchall()
 
@@ -151,10 +152,10 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ?"
+                " AND pid != ? AND updated >= ?"
                 " ORDER BY ABS(? - score) ASC LIMIT ?",
-                (gamename, region, category, pid, mine["score"],
-                 data.get("limit", 10) - 1)
+                (gamename, region, category, pid, data["since"],
+                 mine["score"], data.get("limit", 10) - 1)
             )
             others = cursor.fetchall()
             return [mine] + others
@@ -173,10 +174,11 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region = ? AND category = ?"
-                " AND pid IN ({}) LIMIT ?".format(
+                " AND pid IN ({}) AND updated >= ? LIMIT ?".format(
                     ", ".join("{}".format(i) for i in data.get("friends", []))
                 ),
-                (gamename, region, category, data.get("limit", 10) - 1)
+                (gamename, region, category,
+                 data["since"], data.get("limit", 10) - 1)
             )
             friends = cursor.fetchall()
             return [mine] + friends
@@ -196,10 +198,10 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND (score - ?) >= 0"
+                " AND pid != ? AND (score - ?) >= 0 AND updated >= ?"
                 " ORDER BY score ASC LIMIT ?",
                 (gamename, region, category, pid, mine["score"],
-                 data.get("limit", 10) - 1)
+                 data["since"], data.get("limit", 10) - 1)
             )
             others = cursor.fetchall()
             return [mine] + others
@@ -219,15 +221,22 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND (score - ?) <= 0"
+                " AND pid != ? AND (score - ?) <= 0 AND updated >= ?"
                 " ORDER BY score ASC LIMIT ?",
                 (gamename, region, category, pid, mine["score"],
-                 data.get("limit", 10) - 1)
+                 data["since"], data.get("limit", 10) - 1)
             )
             others = cursor.fetchall()
             return [mine] + others
 
     def web_get2(self, gamename, pid, region, category, mode, data):
+        # Time filter
+        if data.get("updated", 0):
+            data["since"] = datetime.now() - timedelta(minutes=data["updated"])
+        else:
+            data["since"] = datetime(1970, 1, 1)
+
+        # Handle mode
         if mode == 0:
             return self.web_get2_own(gamename, pid, region, category, data)
         elif mode == 1:
