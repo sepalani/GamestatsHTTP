@@ -181,6 +181,52 @@ class GamestatsDatabase(object):
             friends = cursor.fetchall()
             return [mine] + friends
 
+    def web_get2_nearhi(self, gamename, pid, region, category, data):
+        # TODO - Nearby high?
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid = ?",
+                (gamename, region, category, pid)
+            )
+            mine = cursor.fetchone()
+            if not mine:
+                mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid != ? AND (score - ?) >= 0"
+                " ORDER BY score ASC LIMIT ?",
+                (gamename, region, category, pid, mine["score"],
+                 data.get("limit", 10) - 1)
+            )
+            others = cursor.fetchall()
+            return [mine] + others
+
+    def web_get2_nearlo(self, gamename, pid, region, category, data):
+        # TODO - Nearby low?
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid = ?",
+                (gamename, region, category, pid)
+            )
+            mine = cursor.fetchone()
+            if not mine:
+                mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid != ? AND (score - ?) <= 0"
+                " ORDER BY score ASC LIMIT ?",
+                (gamename, region, category, pid, mine["score"],
+                 data.get("limit", 10) - 1)
+            )
+            others = cursor.fetchall()
+            return [mine] + others
+
     def web_get2(self, gamename, pid, region, category, mode, data):
         if mode == 0:
             return self.web_get2_own(gamename, pid, region, category, data)
@@ -190,6 +236,12 @@ class GamestatsDatabase(object):
             return self.web_get2_nearby(gamename, pid, region, category, data)
         elif mode == 3:
             return self.web_get2_friends(gamename, pid, region, category, data)
+        elif mode == 4:
+            # Blind guess
+            return self.web_get2_nearhi(gamename, pid, region, category, data)
+        elif mode == 5:
+            # Blind guess
+            return self.web_get2_nearlo(gamename, pid, region, category, data)
         raise ValueError("Unknown get2 mode: {}".format(mode))
 
 

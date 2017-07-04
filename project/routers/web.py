@@ -327,7 +327,7 @@ def client_get2(handler, gamename, resource):
     )
     row_count = len(rows)
     row_total = row_count  # Fake it, FTM
-    if mode == 2 or mode == 3:
+    if mode in [2, 3, 4, 5]:
         row_total -= 1
     message = struct.pack("<III", mode, row_count, row_total)
     for row in rows:
