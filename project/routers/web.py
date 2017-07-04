@@ -51,10 +51,7 @@ def generate_challenge(size=32):
 def require_challenge(q, handler):
     """Send a challenge if required."""
     if not q.get("hash", []):
-        handler.send_response(200)
-        handler.send_headers()
-        handler.end_headers()
-        handler.wfile.write(generate_challenge())
+        handler.send_message(generate_challenge())
         return True
     return False
 
@@ -100,14 +97,9 @@ def root_download(handler, gamename, resource):
     ))
 
     if not data:
-        handler.send_response(404)
-        handler.send_headers()
-        handler.end_headers()
+        handler.send_message(code=404)
     else:
-        handler.send_response(200)
-        handler.send_headers(len(data["data"]))
-        handler.end_headers()
-        handler.wfile.write(data["data"])
+        handler.send_message(data["data"])
 
 
 def root_upload(handler, gamename, resource):
@@ -132,9 +124,7 @@ def root_upload(handler, gamename, resource):
         handler.server.gamestats_db
     )
 
-    handler.send_response(200)
-    handler.send_headers()
-    handler.end_headers()
+    handler.send_message()
 
 
 def root_store(handler, gamename, resource):
@@ -156,9 +146,7 @@ def root_store(handler, gamename, resource):
 
     # TODO - Implement it properly
     handler.log_message("Dummy store request for {}: {}".format(gamename, q))
-    handler.send_response(200)
-    handler.send_headers(0)
-    handler.end_headers()
+    handler.send_message(b"")
 
 
 # Gamestats2
@@ -225,10 +213,7 @@ def client_get(handler, gamename, resource):
 
     # Generate response
     message += gamestats_keys.do_hmac(key, message)
-    handler.send_response(200)
-    handler.send_headers(len(message))
-    handler.end_headers()
-    handler.wfile.write(message)
+    handler.send_message(message)
     return
 
 
@@ -270,10 +255,7 @@ def client_put(handler, gamename, resource):
         key = gamestats_keys.DUMMY_GAMESTATS_KEY
     message = b"done"
     message += gamestats_keys.do_hmac(key, message)
-    handler.send_response(200)
-    handler.send_headers(len(message))
-    handler.end_headers()
-    handler.wfile.write(message)
+    handler.send_message(message)
 
 
 def client_get2(handler, gamename, resource):
@@ -340,10 +322,7 @@ def client_get2(handler, gamename, resource):
 
     # Generate response
     message += gamestats_keys.do_hmac(key, message)
-    handler.send_response(200)
-    handler.send_headers(len(message))
-    handler.end_headers()
-    handler.wfile.write(message)
+    handler.send_message(message)
 
 
 def client_put2(handler, gamename, resource):
@@ -410,10 +389,7 @@ def client_put2(handler, gamename, resource):
         key = gamestats_keys.DUMMY_GAMESTATS_KEY
     message = b"done"
     message += gamestats_keys.do_hmac(key, message)
-    handler.send_response(200)
-    handler.send_headers(len(message))
-    handler.end_headers()
-    handler.wfile.write(message)
+    handler.send_message(message)
 
 
 # Super Smash Bros. Brawl
@@ -448,9 +424,7 @@ def handle(handler, gamename, resource, resources={}):
             return True
 
     print("[{}] Can't handle {}".format(gamename, resource))
-    handler.send_response(404)
-    handler.send_headers()
-    handler.end_headers()
+    handler.send_message(code=404)
     return False
 
 

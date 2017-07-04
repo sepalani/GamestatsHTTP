@@ -37,14 +37,18 @@ from routers.web import GamestatsRouter
 
 class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
     """Gamestats HTTP request handler."""
-    def send_headers(self, length=None):
-        """Send headers."""
+    def send_message(self, message=None, code=200):
+        """Send message."""
+        self.send_response(code)
         self.send_header("Server", "Microsoft-IIS/6.0")
         self.send_header("server", "GSTPRDSTATSWEB2")
-        if length is not None:
-            self.send_header("Content-Length", length)
+        if message is not None:
+            self.send_header("Content-Length", len(message))
         self.send_header("Content-Type", "text/html")
         self.send_header("X-Powered-By", "ASP.NET")
+        self.end_headers()
+        if message:
+            self.wfile.write(message)
 
     def parse_path(self):
         """Split the gamename and the path."""
