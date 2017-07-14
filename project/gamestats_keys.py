@@ -103,11 +103,11 @@ def xor_data(key, data):
     data = bytearray(data)
     checksum = struct.unpack_from(">I", data, 0)[0]
     x, y, z, checksum_secret = key.constants
-    seed = checksum ^ checksum_secret
-    seed = (seed | seed << 16) & 0xFFFFFFFF
+    seed = (checksum ^ checksum_secret) & 0xFFFF
+    seed |= seed << 16
     for i in range(len(data) - 4):
-        seed = (seed * x + y) & ~z
-        data[4 + i] ^= (seed >> 16) & 0xFF
+        seed = (seed * x + y) % z
+        data[4 + i] ^= seed >> 16 & 0xFF
     return data
 
 
