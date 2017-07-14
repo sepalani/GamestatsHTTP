@@ -58,9 +58,15 @@ def require_challenge(q, handler):
 
 def decrypt_data(data, pid, key):
     """Decrypt data."""
-    data_pid = struct.unpack_from("<I", data, 4)[0]
-    if data_pid != pid:
-        return gamestats_keys.xor_data(key, data)
+    data_checksum = struct.unpack_from("<I", data, 0)[0]
+    data = gamestats_keys.xor_data(key, data)
+    checksum = gamestats_keys.do_checksum(key, data[4:])
+    if checksum != data_checksum:
+        raise ValueError(
+            "Data checksum mismatch, 0x{:08x} expected, 0x{:08x} found".format(
+                data_checksum, checksum
+            )
+        )
     return bytearray(data)
 
 
