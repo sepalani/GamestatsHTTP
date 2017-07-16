@@ -75,6 +75,41 @@ def decode_data(data, pid, key):
     return decrypt_data(base64.urlsafe_b64decode(data), pid, key)
 
 
+def parse_get_mode(mode_data):
+    """Parse get mode."""
+    parsed_data = {}
+    if len(mode_data) >= 4:
+        parsed_data["filter"] = struct.unpack_from("<I", mode_data, 0)[0]
+    if len(mode_data) >= 8:
+        parsed_data["limit"] = struct.unpack_from("<I", mode_data, 4)[0]
+    if len(mode_data) >= 12:
+        parsed_data["updated"] = struct.unpack_from("<I", mode_data, 8)[0]
+    if len(mode_data) >= 268:
+        parsed_data["friends"] = set(
+            struct.unpack_from("<" + 64*"I", mode_data, 12)
+        )
+        if 0 in parsed_data["friends"]:
+            parsed_data["friends"].remove(0)
+    return parsed_data
+
+
+def pack_rows(rows, mode):
+    """Pack rows."""
+    row_count = len(rows)
+    row_total = row_count  # Fake it, FTM
+    if mode in [2, 3, 4, 5]:
+        row_total -= 1
+    message = struct.pack("<III", mode, row_count, row_total)
+    for order, row in enumerate(rows):
+        message += struct.pack(
+            "<IIIIII",
+            order + 1,  # Fake the order, FTM
+            row["pid"], row["score"], row["region"], 0, len(row["data"])
+        )
+        message += row["data"]
+    return message
+
+
 # Gamestats
 
 def root_download(handler, gamename, resource):
@@ -160,7 +195,7 @@ def root_store(handler, gamename, resource):
 def client_get(handler, gamename, resource):
     """GET /web/client/get.asp route.
 
-    Format (query string): /get.asp?pid=%s&hash=%s&data=%s
+    Format (query string): /get.asp?pid=%d&hash=%s&data=%s
     TODO
 
     Example (data base64 urlsafe decoded):
@@ -177,7 +212,7 @@ def client_get(handler, gamename, resource):
     19 75 04 cf - Checksum
     0f 8f 93 1c - Player ID
     ff 00 00 00 - Region mask
-    00 00 00 00 - ??? (Category?)
+    00 00 00 00 - Category
     02 00 00 00 - Get mode
     0c 00 00 00 - Get mode data size
     01 00 00 00 - Row filter
@@ -191,30 +226,22 @@ def client_get(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    # TODO - Implement get.asp
-    handler.log_message("Dummy get request for {}: {}".format(gamename, q))
+    handler.log_message("Get request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, region, category, mode, mode_data_size = \
         struct.unpack_from("<IIIIII", data)
+    mode_data = data[24:24+mode_data_size]
+    parsed_data = parse_get_mode(mode_data)
 
     # Get rows
-    if mode == 2 or mode == 3:
-        rows = [gamestats_database.get2_dictrow(gamename, pid, 0xFFFFFFFF, 0)]
-        row_count = 1
-    else:
-        rows = []
-        row_count = 0
-    row_total = 0
-    message = struct.pack("<III", mode, row_count, row_total)
-    for row in rows:
-        message += struct.pack(
-            "<IIIIII",
-            0, row["pid"], row["score"], row["region"], 0, len(row["data"])
-        )
-        message += row["data"]
+    rows = gamestats_database.web_get2(
+        gamename, pid, region, category, mode, parsed_data,
+        handler.server.gamestats_db
+    )
 
     # Generate response
+    message = pack_rows(rows, mode)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
     return
@@ -301,39 +328,16 @@ def client_get2(handler, gamename, resource):
     checksum, pid, packet_len, region, category, mode, mode_data_size = \
         struct.unpack_from("<IIIIIII", data)
     mode_data = data[28:28+mode_data_size]
-    parsed_data = {}
-    if len(mode_data) >= 4:
-        parsed_data["filter"] = struct.unpack_from("<I", mode_data, 0)[0]
-    if len(mode_data) >= 8:
-        parsed_data["limit"] = struct.unpack_from("<I", mode_data, 4)[0]
-    if len(mode_data) >= 12:
-        parsed_data["updated"] = struct.unpack_from("<I", mode_data, 8)[0]
-    if len(mode_data) >= 268:
-        parsed_data["friends"] = set(
-            struct.unpack_from("<" + 64*"I", mode_data, 12)
-        )
-        if 0 in parsed_data["friends"]:
-            parsed_data["friends"].remove(0)
+    parsed_data = parse_get_mode(mode_data)
 
     # Get rows
     rows = gamestats_database.web_get2(
         gamename, pid, region, category, mode, parsed_data,
         handler.server.gamestats_db
     )
-    row_count = len(rows)
-    row_total = row_count  # Fake it, FTM
-    if mode in [2, 3, 4, 5]:
-        row_total -= 1
-    message = struct.pack("<III", mode, row_count, row_total)
-    for order, row in enumerate(rows):
-        message += struct.pack(
-            "<IIIIII",
-            order + 1,  # Fake the order, FTM
-            row["pid"], row["score"], row["region"], 0, len(row["data"])
-        )
-        message += row["data"]
 
     # Generate response
+    message = pack_rows(rows, mode)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
