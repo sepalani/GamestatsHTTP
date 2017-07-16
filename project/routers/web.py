@@ -169,9 +169,9 @@ def client_get(handler, gamename, resource):
     0010  02 00 00 00 0c 00 00 00  01 00 00 00 0a 00 00 00  |................|
     0020  00 00 00 00                                       |....|
      - Mode 0x01 (top)?
-    0000  19 75 05 66 0f 8f 93 1c  ff 00 00 00 00 00 00 00 |.u.f............|
-    0010  01 00 00 00 0c 00 00 00  01 00 00 00 0a 00 00 00 |................|
-    0020  c0 a8 00 00                                      |....|
+    0000  19 75 05 66 0f 8f 93 1c  ff 00 00 00 00 00 00 00  |.u.f............|
+    0010  01 00 00 00 0c 00 00 00  01 00 00 00 0a 00 00 00  |................|
+    0020  c0 a8 00 00                                       |....|
 
     Description:
     19 75 04 cf - Checksum
@@ -223,22 +223,29 @@ def client_get(handler, gamename, resource):
 def client_put(handler, gamename, resource):
     """GET /web/client/put.asp route.
 
-    Format (query string): /put.asp?pid=%s&hash=%s&data=%s
+    Format (query string): /put.asp?pid=%d&hash=%s&data=%s
      - pid: Player ID
      - hash: SHA1(key.salt + challenge)?
      - data: Base64 urlsafe encoded data to upload
 
     Example (data base64 urlsafe decoded):
+     - mdamiiwalkds
     0000  40 1f 41 89 26 3c c7 23  04 00 00 00 03 00 00 00  |@.A.&<.#........|
     0010  50 0c 00 00 00 00 00 00                           |P.......|
+     - sonicrushads
+    0000  12 3f 16 97 0c 3f c7 23  04 00 00 00 00 00 00 00  |.?...?.#........|
+    0010  ff 04 91 35 14 00 00 00  01 00 00 00 4d 00 61 00  |...5........M.a.|
+    0020  74 00 7a 00 65 00 00 00  00 00 00 00              |t.z.e.......|
+    002c
 
     Description:
-    40 1f 41 89 - Checksum
-    26 3c c7 23 - Player ID
+    12 3f 16 97 - Checksum
+    0c 3f c7 23 - Player ID
     04 00 00 00 - Region
-    03 00 00 00 - ??? (Category?)
-    50 0c 00 00 - Score
-    00 00 00 00 - ??? (Player data size?)
+    00 00 00 00 - Category
+    ff 04 91 35 - Score
+    14 00 00 00 - Player data size
+    [...]       - Player data
     """
     qs = urlparse.urlparse(resource).query
     q = urlparse.parse_qs(qs)
@@ -247,9 +254,19 @@ def client_put(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    # TODO - Implement put.asp
-    handler.log_message("Dummy put request for {}: {}".format(gamename, q))
+    handler.log_message("Put request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
+    checksum, pid, region, category, score, player_data_size = \
+        struct.unpack_from("<IIIIII", data)
+
+    # TODO - Check sizes (and not reuse web_put2?)
+    player_data = bytes(data[24:24+player_data_size])
+    gamestats_database.web_put2(
+        gamename,
+        pid, region, category, score, player_data,
+        handler.server.gamestats_db
+    )
 
     # Generate response
     message = b"done"
@@ -365,7 +382,7 @@ def client_put2(handler, gamename, resource):
     checksum, pid, packet_len, region, category, score, player_data_size = \
         struct.unpack_from("<IIIIIII", data)
 
-    # TODO - Check sizes and checksum
+    # TODO - Check sizes
     player_data = bytes(data[28:28+player_data_size])
     gamestats_database.web_put2(
         gamename,
