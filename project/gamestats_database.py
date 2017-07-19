@@ -73,6 +73,11 @@ def get2_dictrow(gamename, pid, region, category,
 
 class GamestatsDatabase(object):
     """Gamestats database class."""
+    FILTERS = {
+        0: "ASC",
+        1: "DESC"
+    }
+
     def __init__(self, path=DATABASE_PATH):
         self.path = path
         self.conn = sqlite3.connect(self.path, timeout=DATABASE_TIMEOUT)
@@ -123,7 +128,9 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ? ORDER BY score ASC" + limit, parameters
+                " AND updated >= ? ORDER BY score {}".format(
+                    self.FILTERS.get(data.get("filter"), "")
+                ) + limit, parameters
             )
             return cursor.fetchall()
 
@@ -132,7 +139,9 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ? ORDER BY score ASC LIMIT ?",
+                " AND updated >= ? ORDER BY score {} LIMIT ?".format(
+                    self.FILTERS.get(data.get("filter"), "")
+                ),
                 (gamename, region, category,
                  data["since"], data.get("limit", 10))
             )
@@ -153,7 +162,9 @@ class GamestatsDatabase(object):
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
                 " AND pid != ? AND updated >= ?"
-                " ORDER BY ABS(? - score) ASC LIMIT ?",
+                " ORDER BY ABS(? - score) {} LIMIT ?".format(
+                    self.FILTERS.get(data.get("filter"), "")
+                ),
                 (gamename, region, category, pid, data["since"],
                  mine["score"], data.get("limit", 10) - 1)
             )
@@ -174,8 +185,10 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region = ? AND category = ?"
-                " AND pid IN ({}) AND updated >= ? LIMIT ?".format(
-                    ", ".join("{}".format(i) for i in data.get("friends", []))
+                " AND pid IN ({}) AND updated >= ?"
+                " ORDER BY score {} LIMIT ?".format(
+                    ", ".join("{}".format(i) for i in data.get("friends", [])),
+                    self.FILTERS.get(data.get("filter"), "")
                 ),
                 (gamename, region, category,
                  data["since"], data.get("limit", 10) - 1)
@@ -199,7 +212,9 @@ class GamestatsDatabase(object):
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
                 " AND pid != ? AND (score - ?) >= 0 AND updated >= ?"
-                " ORDER BY score ASC LIMIT ?",
+                " ORDER BY score {} LIMIT ?".format(
+                    self.FILTERS.get(data.get("filter"), "")
+                ),
                 (gamename, region, category, pid, mine["score"],
                  data["since"], data.get("limit", 10) - 1)
             )
@@ -222,7 +237,9 @@ class GamestatsDatabase(object):
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
                 " AND pid != ? AND (score - ?) <= 0 AND updated >= ?"
-                " ORDER BY score ASC LIMIT ?",
+                " ORDER BY score {} LIMIT ?".format(
+                    self.FILTERS.get(data.get("filter"), "")
+                ),
                 (gamename, region, category, pid, mine["score"],
                  data["since"], data.get("limit", 10) - 1)
             )
