@@ -29,6 +29,7 @@ try:
 except ImportError:
     # Python 3
     import urllib.parse as urlparse
+from datetime import datetime
 
 import gamestats_database
 import gamestats_keys
@@ -93,18 +94,34 @@ def parse_get_mode(mode_data):
     return parsed_data
 
 
-def pack_rows(rows, mode):
+def pack_rows(rows, mode, handler):
     """Pack rows."""
+    now = datetime.now()
     row_count = len(rows)
     row_total = row_count  # Fake it, FTM
     if mode in [2, 3, 4, 5]:
         row_total -= 1
     message = struct.pack("<III", mode, row_count, row_total)
     for order, row in enumerate(rows):
+        if order == 0 and mode in [2, 3, 4, 5]:
+            # Mine
+            updated = 0
+        else:
+            try:
+                delta = now - datetime.strptime(
+                    row["updated"],
+                    "%Y-%m-%d %H:%M:%S.%f"
+                )
+                updated = int(delta.total_seconds() // 60)
+            except Exception as e:
+                handler.log_message("Failed to parse time: {}".format(
+                    row.get("updated")
+                ))
+                updated = 0
         message += struct.pack(
             "<IIIIII",
             order + 1,  # Fake the order, FTM
-            row["pid"], row["score"], row["region"], 0, len(row["data"])
+            row["pid"], row["score"], row["region"], updated, len(row["data"])
         )
         message += row["data"]
     return message
@@ -241,7 +258,7 @@ def client_get(handler, gamename, resource):
     )
 
     # Generate response
-    message = pack_rows(rows, mode)
+    message = pack_rows(rows, mode, handler)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
     return
@@ -337,7 +354,7 @@ def client_get2(handler, gamename, resource):
     )
 
     # Generate response
-    message = pack_rows(rows, mode)
+    message = pack_rows(rows, mode, handler)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
