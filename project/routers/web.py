@@ -439,6 +439,38 @@ def custom_client_upload(handler, gamename, resource):
     pass
 
 
+# Pokemon Battle Revolution
+
+def pbrcheck_check(handler, gamename, resource):
+    """GET /check.asp route.
+
+    Format (query string): /check.asp?pid=%d&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)?
+     - data: Base64 urlsafe encoded data to upload
+
+    Example (data base64 urlsafe decoded):
+    TODO
+
+    Description:
+    TODO
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if require_challenge(q, handler):
+        return
+
+    handler.log_message("Dummy check request for {}: {}".format(gamename, q))
+    key = handler.get_gamekey(gamename)
+
+    # Generate response
+    message = b""
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_message(message)
+
+
 # Handle requests
 
 def handle(handler, gamename, resource, resources={}):
@@ -489,11 +521,19 @@ def handle_web_custom_client(handler, gamename, resource):
     })
 
 
+def handle_web_pbrcheck(handler, gamename, resource):
+    """Handle /web/pbrcheck routes."""
+    return handle(handler, gamename, resource, {
+        "check.asp": pbrcheck_check
+    })
+
+
 GENERIC_COMMANDS = sorted({
     "/": handle_root,
     "/web/client/": handle_web_client,
     "/web/custom/": handle_web_custom,
-    "/web/custom/client/": handle_web_custom_client
+    "/web/custom/client/": handle_web_custom_client,
+    "/web/pbrcheck/": handle_web_pbrcheck
 }.items(), reverse=True)
 
 COMMANDS = {
