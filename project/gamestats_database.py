@@ -139,13 +139,24 @@ class GamestatsDatabase(object):
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ? ORDER BY score {} LIMIT ?".format(
+                " AND pid = ?",
+                (gamename, region, category, pid)
+            )
+            mine = cursor.fetchone()
+            if not mine:
+                mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            cursor.execute(
+                "SELECT * FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid != ? AND updated >= ?"
+                " ORDER BY score {} LIMIT ?".format(
                     self.FILTERS.get(data.get("filter"), "")
                 ),
-                (gamename, region, category,
+                (gamename, region, category, pid,
                  data["since"], data.get("limit", 10))
             )
-            return cursor.fetchall()
+            others = cursor.fetchall()
+            return [mine] + others
 
     def web_get2_nearby(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
