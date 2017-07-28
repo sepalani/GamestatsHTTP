@@ -94,15 +94,12 @@ def parse_get_mode(mode_data):
     return parsed_data
 
 
-def pack_rows(rows, mode, handler):
+def pack_rows(row_total, rows, mode, handler):
     """Pack rows."""
     now = datetime.now()
     row_count = len(rows)
-    row_total = row_count  # Fake it, FTM
-    if mode in [2, 3, 4, 5]:
-        row_total -= 1
     message = struct.pack("<III", mode, row_count, row_total)
-    max_length = max(len(row["data"]) for row in rows)
+    max_length = max(len(row["data"]) for row in rows) if rows else 0
     for order, row in enumerate(rows):
         if order == 0 and mode in [2, 3, 4, 5]:
             # Mine
@@ -255,13 +252,13 @@ def client_get(handler, gamename, resource):
     parsed_data = parse_get_mode(mode_data)
 
     # Get rows
-    rows = gamestats_database.web_get2(
+    total, rows = gamestats_database.web_get2(
         gamename, pid, region, category, mode, parsed_data,
         handler.server.gamestats_db
     )
 
     # Generate response
-    message = pack_rows(rows, mode, handler)
+    message = pack_rows(total, rows, mode, handler)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
     return
@@ -351,13 +348,13 @@ def client_get2(handler, gamename, resource):
     parsed_data = parse_get_mode(mode_data)
 
     # Get rows
-    rows = gamestats_database.web_get2(
+    total, rows = gamestats_database.web_get2(
         gamename, pid, region, category, mode, parsed_data,
         handler.server.gamestats_db
     )
 
     # Generate response
-    message = pack_rows(rows, mode, handler)
+    message = pack_rows(total, rows, mode, handler)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 

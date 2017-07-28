@@ -132,7 +132,15 @@ class GamestatsDatabase(object):
                     self.FILTERS.get(data.get("filter"), "")
                 ) + limit, parameters
             )
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND updated >= ?",
+                (gamename, region, category, data["since"])
+            )
+            total = cursor.fetchone()["total"]
+            return total, rows
 
     def web_get2_top(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
@@ -145,7 +153,15 @@ class GamestatsDatabase(object):
                 (gamename, region, category,
                  data["since"], data.get("limit", 10))
             )
-            return cursor.fetchall()
+            rows = cursor.fetchall()
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND updated >= ?",
+                (gamename, region, category, data["since"])
+            )
+            total = cursor.fetchone()["total"]
+            return total, rows
 
     def web_get2_nearby(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
@@ -169,7 +185,14 @@ class GamestatsDatabase(object):
                  mine["score"], data.get("limit", 10) - 1)
             )
             others = cursor.fetchall()
-            return [mine] + others
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid != ? AND updated >= ?",
+                (gamename, region, category, pid, data["since"])
+            )
+            total = cursor.fetchone()["total"]
+            return total, [mine] + others
 
     def web_get2_friends(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
@@ -194,7 +217,16 @@ class GamestatsDatabase(object):
                  data["since"], data.get("limit", 10) - 1)
             )
             friends = cursor.fetchall()
-            return [mine] + friends
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM ranking"
+                " WHERE gamename = ? AND region = ? AND category = ?"
+                " AND pid IN ({}) AND updated >= ?".format(
+                    ", ".join("{}".format(i) for i in data.get("friends", [])),
+                ),
+                (gamename, region, category, data["since"])
+            )
+            total = cursor.fetchone()["total"]
+            return total, [mine] + friends
 
     def web_get2_nearhi(self, gamename, pid, region, category, data):
         # TODO - Nearby high?
@@ -219,7 +251,15 @@ class GamestatsDatabase(object):
                  data["since"], data.get("limit", 10) - 1)
             )
             others = cursor.fetchall()
-            return [mine] + others
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid != ? AND (score - ?) >= 0 AND updated >= ?",
+                (gamename, region, category, pid, mine["score"],
+                 data["since"])
+            )
+            total = cursor.fetchone()["total"]
+            return total, [mine] + others
 
     def web_get2_nearlo(self, gamename, pid, region, category, data):
         # TODO - Nearby low?
@@ -244,7 +284,15 @@ class GamestatsDatabase(object):
                  data["since"], data.get("limit", 10) - 1)
             )
             others = cursor.fetchall()
-            return [mine] + others
+            cursor.execute(
+                "SELECT COUNT(*) AS total FROM ranking"
+                " WHERE gamename = ? AND region & ? AND category = ?"
+                " AND pid != ? AND (score - ?) <= 0 AND updated >= ?",
+                (gamename, region, category, pid, mine["score"],
+                 data["since"])
+            )
+            total = cursor.fetchone()["total"]
+            return total, [mine] + others
 
     def web_get2(self, gamename, pid, region, category, mode, data):
         # Time filter
