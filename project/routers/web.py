@@ -102,6 +102,7 @@ def pack_rows(rows, mode, handler):
     if mode in [2, 3, 4, 5]:
         row_total -= 1
     message = struct.pack("<III", mode, row_count, row_total)
+    max_length = max(len(row["data"]) for row in rows)
     for order, row in enumerate(rows):
         if order == 0 and mode in [2, 3, 4, 5]:
             # Mine
@@ -118,12 +119,14 @@ def pack_rows(rows, mode, handler):
                     row.get("updated")
                 ))
                 updated = 0
+        length = len(row["data"])
         message += struct.pack(
             "<IIIIII",
             order + 1,  # Fake the order, FTM
-            row["pid"], row["score"], row["region"], updated, len(row["data"])
+            row["pid"], row["score"], row["region"], updated, length
         )
-        message += row["data"]
+        padding = b'\x00' * (max_length - length)
+        message += row["data"] + padding
     return message
 
 
