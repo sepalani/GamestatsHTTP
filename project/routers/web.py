@@ -119,7 +119,7 @@ def pack_rows(row_total, rows, mode, handler):
         length = len(row["data"])
         message += struct.pack(
             "<IIIIII",
-            order + 1,  # Fake the order, FTM
+            order,  # Fake the order, FTM
             row["pid"], row["score"], row["region"], updated, max_length
         )
         padding = b'\x00' * (max_length - length)
