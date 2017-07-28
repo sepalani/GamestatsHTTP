@@ -99,11 +99,11 @@ def pack_rows(rows, mode, handler):
     now = datetime.now()
     row_count = len(rows)
     row_total = row_count  # Fake it, FTM
-    if mode in [1, 2, 3, 4, 5]:
+    if mode in [2, 3, 4, 5]:
         row_total -= 1
     message = struct.pack("<III", mode, row_count, row_total)
     for order, row in enumerate(rows):
-        if order == 0 and mode in [1, 2, 3, 4, 5]:
+        if order == 0 and mode in [2, 3, 4, 5]:
             # Mine
             updated = 0
         else:
