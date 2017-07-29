@@ -105,16 +105,21 @@ def pack_rows(row_total, rows, mode, handler):
             updated = 0
         else:
             try:
-                delta = now - datetime.strptime(
+                row_time = datetime.strptime(
                     row["updated"],
                     "%Y-%m-%d %H:%M:%S.%f"
                 )
-                updated = int(delta.total_seconds() // 60)
+                updated = int((now - row_time).total_seconds() // 60)
             except Exception as e:
                 handler.log_message("Failed to parse time: {}".format(
                     row.get("updated")
                 ))
                 updated = 0
+        if mode == 1:
+            order = 0
+        if updated < 0:
+            handler.log_message("Row from the future: {}".format(row_time))
+            updated = 0
         message += struct.pack(
             "<IIIIII",
             order,  # Fake the order, FTM
