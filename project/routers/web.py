@@ -120,12 +120,16 @@ def pack_rows(row_total, rows, mode, handler):
         if updated < 0:
             handler.log_message("Row from the future: {}".format(row_time))
             updated = 0
+        # 4-byte alignment
+        data_size = len(row["data"])
+        padding = (4 - data_size % 4) % 4
         message += struct.pack(
             "<IIIIII",
             order,  # Fake the order, FTM
-            row["pid"], row["score"], row["region"], updated, len(row["data"])
+            row["pid"], row["score"], row["region"], updated,
+            data_size + padding
         )
-        message += row["data"]
+        message += row["data"] + padding * b"\x00"
     return message
 
 
