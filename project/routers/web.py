@@ -116,6 +116,14 @@ def pack_rows(row_total, rows, mode, handler):
                 ))
                 updated = 0
         if mode == 1:
+            order = 1
+        elif order == 0:
+            my_score = row["score"]
+            order = len(set(
+                r["score"] for r in rows
+                if r["score"] >= my_score
+            ))
+        else:
             order = 0
         if updated < 0:
             handler.log_message("Row from the future: {}".format(row_time))
