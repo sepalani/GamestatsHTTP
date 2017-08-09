@@ -94,7 +94,7 @@ def parse_get_mode(mode_data):
     return parsed_data
 
 
-def pack_rows(row_total, rows, mode, handler):
+def pack_rows(row_total, rows, mode, data, handler):
     """Pack rows."""
     now = datetime.now()
     row_count = len(rows)
@@ -119,10 +119,16 @@ def pack_rows(row_total, rows, mode, handler):
             order = 1
         elif order == 0:
             my_score = row["score"]
-            order = len(set(
-                r["score"] for r in rows
-                if r["score"] >= my_score
-            ))
+            if data.get("filter", 1):
+                order = len(set(
+                    r["score"] for r in rows
+                    if r["score"] >= my_score
+                ))
+            else:
+                order = len(set(
+                    r["score"] for r in rows
+                    if r["score"] <= my_score
+                ))
         else:
             order = 0
         if updated < 0:
@@ -272,7 +278,7 @@ def client_get(handler, gamename, resource):
     )
 
     # Generate response
-    message = pack_rows(total, rows, mode, handler)
+    message = pack_rows(total, rows, mode, parsed_data, handler)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
     return
@@ -368,7 +374,7 @@ def client_get2(handler, gamename, resource):
     )
 
     # Generate response
-    message = pack_rows(total, rows, mode, handler)
+    message = pack_rows(total, rows, mode, parsed_data, handler)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
