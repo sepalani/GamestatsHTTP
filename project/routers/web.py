@@ -100,6 +100,7 @@ def pack_rows(row_total, rows, mode, data, handler):
     row_count = len(rows)
     message = struct.pack("<III", mode, row_count, row_total)
     for order, row in enumerate(rows):
+        # Last update
         if order == 0 and mode in [2, 3, 4, 5]:
             # Mine
             updated = 0
@@ -115,31 +116,26 @@ def pack_rows(row_total, rows, mode, data, handler):
                     row.get("updated")
                 ))
                 updated = 0
+        if updated < 0:
+            handler.log_message("Row from the future: {}".format(row_time))
+            updated = 0
+        # Mode order
         if mode == 1:
             order = 1
         elif order == 0:
             my_score = row["score"]
             if data.get("filter", 1):
-                order = len(set(
-                    r["score"] for r in rows
-                    if r["score"] >= my_score
-                ))
+                order = 1 + sum(r["score"] > my_score for r in rows)
             else:
-                order = len(set(
-                    r["score"] for r in rows
-                    if r["score"] <= my_score
-                ))
+                order = 1 + sum(r["score"] < my_score for r in rows)
         else:
             order = 0
-        if updated < 0:
-            handler.log_message("Row from the future: {}".format(row_time))
-            updated = 0
         # 4-byte alignment
         data_size = len(row["data"])
         padding = (4 - data_size % 4) % 4
         message += struct.pack(
             "<IIIIII",
-            order,  # Fake the order, FTM
+            order,
             row["pid"], row["score"], row["region"], updated,
             data_size + padding
         )
