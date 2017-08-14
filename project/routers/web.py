@@ -120,16 +120,10 @@ def pack_rows(row_total, rows, mode, data, handler):
             handler.log_message("Row from the future: {}".format(row_time))
             updated = 0
         # Mode order
-        if mode == 1:
-            order = 1
-        elif order == 0:
-            my_score = row["score"]
-            if data.get("filter", 1):
-                order = 1 + sum(r["score"] > my_score for r in rows)
-            else:
-                order = 1 + sum(r["score"] < my_score for r in rows)
+        if data.get("filter", 1):
+            order = 1 + sum(r["score"] > row["score"] for r in rows)
         else:
-            order = 0
+            order = 1 + sum(r["score"] < row["score"] for r in rows)
         # 4-byte alignment
         data_size = len(row["data"])
         padding = (4 - data_size % 4) % 4
