@@ -71,6 +71,18 @@ def get2_dictrow(gamename, pid, region, category,
     }
 
 
+def sort_rows(data, rows, mine=None):
+    """Sort rows."""
+    if mine is None:
+        # Rows already sorted
+        return rows
+    if data.get("filter", 1):
+        rows.sort(key=lambda r: r["score"], reverse=True)
+    else:
+        rows.sort(key=lambda r: r["score"], reverse=False)
+    return [mine] + rows
+
+
 class GamestatsDatabase(object):
     """Gamestats database class."""
     FILTERS = {
@@ -140,7 +152,7 @@ class GamestatsDatabase(object):
                 (gamename, region, category, data["since"])
             )
             total = cursor.fetchone()["total"]
-            return total, rows
+            return total, sort_rows(data, rows)
 
     def web_get2_top(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
@@ -161,7 +173,7 @@ class GamestatsDatabase(object):
                 (gamename, region, category, data["since"])
             )
             total = cursor.fetchone()["total"]
-            return total, rows
+            return total, sort_rows(data, rows)
 
     def web_get2_nearby(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
@@ -192,7 +204,7 @@ class GamestatsDatabase(object):
                 (gamename, region, category, pid, data["since"])
             )
             total = cursor.fetchone()["total"]
-            return total, [mine] + others
+            return total, sort_rows(data, others, mine)
 
     def web_get2_friends(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
@@ -226,7 +238,7 @@ class GamestatsDatabase(object):
                 (gamename, region, category, data["since"])
             )
             total = cursor.fetchone()["total"]
-            return total, [mine] + friends
+            return total, sort_rows(data, friends, mine)
 
     def web_get2_nearhi(self, gamename, pid, region, category, data):
         # TODO - Nearby high?
@@ -259,7 +271,7 @@ class GamestatsDatabase(object):
                  data["since"])
             )
             total = cursor.fetchone()["total"]
-            return total, [mine] + others
+            return total, sort_rows(data, others, mine)
 
     def web_get2_nearlo(self, gamename, pid, region, category, data):
         # TODO - Nearby low?
@@ -292,7 +304,7 @@ class GamestatsDatabase(object):
                  data["since"])
             )
             total = cursor.fetchone()["total"]
-            return total, [mine] + others
+            return total, sort_rows(data, others, mine)
 
     def web_get2(self, gamename, pid, region, category, mode, data):
         # Time filter
