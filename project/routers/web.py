@@ -94,6 +94,15 @@ def parse_get_mode(mode_data):
     return parsed_data
 
 
+def pack_date(date):
+    """Pack date."""
+    return struct.pack(
+        "<IIIIII",
+        date.year, date.month - 1, date.day,
+        date.hour, date.minute, date.second
+    )
+
+
 def pack_rows(row_total, rows, mode, data, handler):
     """Pack rows."""
     now = datetime.now()
@@ -434,11 +443,118 @@ def custom_test(handler, gamename, resource):
 
 
 def custom_client_check(handler, gamename, resource):
-    pass
+    """GET /check.asp route.
+
+    [SBS] CheckStorageSize function.
+
+    Format (query string): /check.asp?pid=%d&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)?
+     - data: Base64 urlsafe encoded data to upload
+
+    Example (data base64 urlsafe decoded):
+    0000  06 91 07 8d 54 00 00 00  04 00 00 00 02 00 00 00  |....T...........|
+
+    Description:
+    06 91 07 8d - Checksum
+    54 00 00 00 - Player ID
+    04 00 00 00 - Packet size
+    02 00 00 00 - ???
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if require_challenge(q, handler):
+        return
+
+    handler.log_message("SBS check request for {}: {}".format(gamename, q))
+    key = handler.get_gamekey(gamename)
+
+    # WIP
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
+
+    # Generate response
+    message = b"\x00\x00\x00\x00"   # Upload
+    message += b"\x00\x00\x00\x00"  # Response code
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_message(message)
 
 
 def custom_client_download(handler, gamename, resource):
-    pass
+    """GET /download.asp route.
+
+    [SBS] GetData function.
+
+    Request format (query string): /download.asp?pid=%d&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)?
+     - data: Base64 urlsafe encoded data to download
+
+    Request example (data base64 urlsafe decoded):
+    0000  06 91 05 ce 83 b8 4f bb  b1 a2 f2 35 99 0e 00 ea  |......O....5....|
+
+    Request description:
+    06 91 05 ce - Checksum
+    83 b8 4f bb - ???
+    b1 a2 f2 35 - ???
+    99 0e 00 ea - ???
+
+    Response example:
+    0000   02 00 00 00 00 00 00 00 73 c7 c8 00 d0 b5 00 00
+    0010   de 07 00 00 04 00 00 00 12 00 00 00 11 00 00 00
+    0020   30 00 00 00 00 00 00 00 de 07 00 00 04 00 00 00
+    0030   12 00 00 00 11 00 00 00 30 00 00 00 17 00 00 00
+    0040   <HMAC>
+
+    Response description:
+    02 00 00 00 - Download mode
+    00 00 00 00 - Response code
+    73 c7 c8 00 - Sake file id
+    d0 b5 00 00 - Sake file size
+    --- Delivery time
+    de 07 00 00 - Year
+    04 00 00 00 - Month (starts at 0)
+    12 00 00 00 - Day
+    11 00 00 00 - Hour
+    30 00 00 00 - Minute
+    00 00 00 00 - Second
+    --- Current time (has to be close to delivery time)
+    de 07 00 00 - Year
+    04 00 00 00 - Month (starts at 0)
+    12 00 00 00 - Day
+    11 00 00 00 - Hour
+    30 00 00 00 - Minute
+    17 00 00 00 - Second
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if require_challenge(q, handler):
+        return
+
+    handler.log_message("SBS download request for {}: {}".format(gamename, q))
+    key = handler.get_gamekey(gamename)
+
+    # WIP
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
+
+    # Generate response
+    # Dummy
+    sake_fileid = 0x00c8c773
+    sake_filesize = 0x0000b5d0
+    delivery_date = datetime(2014, 5, 18, 17, 48, 0)
+    current_time = delivery_date
+    # current_time = datetime.now()
+    message = b"\x02\x00\x00\x00"                   # Download
+    message += b"\x00\x00\x00\x00"                  # Response code
+    message += struct.pack("<I", sake_fileid)       # Sake file id
+    message += struct.pack("<I", sake_filesize)     # Sake file size
+    message += pack_date(delivery_date)             # Delivery time
+    message += pack_date(current_time)              # Current time
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_message(message)
 
 
 def custom_client_wincount(handler, gamename, resource):
@@ -446,7 +562,47 @@ def custom_client_wincount(handler, gamename, resource):
 
 
 def custom_client_upload(handler, gamename, resource):
-    pass
+    """GET /upload.asp route.
+
+    [SBS] PostData function.
+
+    Format (query string): /upload.asp?pid=%d&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)?
+     - data: Base64 urlsafe encoded data to upload
+
+    Example (data base64 urlsafe decoded):
+    0000  06 91 06 d4 54 00 00 00  14 00 00 00 02 00 00 00  |....T...........|
+    0010  07 00 00 00 90 02 00 00  00 00 00 00 00 00 00 00  |................|
+
+    Description:
+    06 91 06 d4 - Checksum
+    54 00 00 00 - Player ID
+    14 00 00 00 - Packet size
+    02 00 00 00 - ???
+    07 00 00 00 - Sake file ID
+    90 02 00 00 - Sake file size
+    00 00 00 00 - ???
+    00 00 00 00 - ???
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if require_challenge(q, handler):
+        return
+
+    handler.log_message("SBS upload request for {}: {}".format(gamename, q))
+    key = handler.get_gamekey(gamename)
+
+    # WIP
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
+
+    # Generate response
+    message = b"\x01\x00\x00\x00"   # Post complete
+    message += b"\x00\x00\x00\x00"  # Response code
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_message(message)
 
 
 # Pokemon Battle Revolution
