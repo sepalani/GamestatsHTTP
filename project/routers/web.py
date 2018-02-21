@@ -492,13 +492,13 @@ def custom_client_download(handler, gamename, resource):
      - data: Base64 urlsafe encoded data to download
 
     Request example (data base64 urlsafe decoded):
-    0000  06 91 05 ce 83 b8 4f bb  b1 a2 f2 35 99 0e 00 ea  |......O....5....|
+    0000  06 91 05 ce fd 58 a4 1c  04 00 00 00 00 00 00 00  |.....X..........|
 
     Request description:
     06 91 05 ce - Checksum
-    83 b8 4f bb - ???
-    b1 a2 f2 35 - ???
-    99 0e 00 ea - ???
+    fd 58 a4 1c - Player ID
+    04 00 00 00 - Packet size
+    00 00 00 00 - ???
 
     Response example:
     0000   02 00 00 00 00 00 00 00 73 c7 c8 00 d0 b5 00 00
@@ -558,7 +558,42 @@ def custom_client_download(handler, gamename, resource):
 
 
 def custom_client_wincount(handler, gamename, resource):
-    pass
+    """GET /wincount.asp route.
+
+    [SBS] GetWinCount function.
+
+    Format (query string): /wincount.asp?pid=%d&hash=%s&data=%s
+     - pid: Player ID
+     - hash: SHA1(key.salt + challenge)?
+     - data: Base64 urlsafe encoded data to upload
+
+    Example (data base64 urlsafe decoded):
+    0000  06 91 07 8f 54 00 00 00  04 00 00 00 01 00 00 00  |....T...........|
+
+    Description:
+    06 91 07 8f - Checksum
+    54 00 00 00 - Player ID
+    04 00 00 00 - Packet size
+    01 00 00 00 - Sake file ID
+    """
+    qs = urlparse.urlparse(resource).query
+    q = urlparse.parse_qs(qs)
+
+    # Generate challenge
+    if require_challenge(q, handler):
+        return
+
+    handler.log_message("SBS wincount request for {}: {}".format(gamename, q))
+    key = handler.get_gamekey(gamename)
+
+    # WIP
+    data = decode_data(q["data"][0], int(q["pid"][0]), key)
+
+    # Generate response
+    message = b"\x03\x00\x00\x00"   # WinCount
+    message += b"\x00\x00\x00\x00"  # Response code
+    message += gamestats_keys.do_hmac(key, message)
+    handler.send_message(message)
 
 
 def custom_client_upload(handler, gamename, resource):
