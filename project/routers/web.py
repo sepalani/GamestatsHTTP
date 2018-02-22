@@ -438,6 +438,31 @@ def client_put2(handler, gamename, resource):
 
 # Super Smash Bros. Brawl
 
+
+class SBS(object):
+    """Smash Bros. Service"""
+
+    class Command(object):
+        """Command code."""
+        UPLOAD = 0
+        COMPLETE = 1
+        DOWNLOAD = 2
+        WINCOUNT = 3
+
+    class Response(object):
+        """Response code."""
+        SUCCESS = 0
+        INVALID_PID = -1
+        INVALID_COMMAND = -2
+        STORAGE_SIZE_FULL = -3
+        RECORD_NOT_FOUND = -4
+        INVALID_PID_2 = -100
+        INVALID_PID_3 = -200
+        NO_FILE = -201
+        INVALID_PID_4 = -300
+        WINCOUNT_NOT_FOUND = -301
+
+
 def custom_test(handler, gamename, resource):
     pass
 
@@ -459,7 +484,7 @@ def custom_client_check(handler, gamename, resource):
     06 91 07 8d - Checksum
     54 00 00 00 - Player ID
     04 00 00 00 - Packet size
-    02 00 00 00 - ???
+    02 00 00 00 - Packet type (0x01 - Spectator, 0x02 - Submission)
     """
     qs = urlparse.urlparse(resource).query
     q = urlparse.parse_qs(qs)
@@ -470,13 +495,11 @@ def custom_client_check(handler, gamename, resource):
 
     handler.log_message("SBS check request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
-
-    # WIP
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
 
     # Generate response
-    message = b"\x00\x00\x00\x00"   # Upload
-    message += b"\x00\x00\x00\x00"  # Response code
+    message = struct.pack("<i", SBS.Command.UPLOAD)
+    message += struct.pack("<i", SBS.Response.SUCCESS)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
@@ -498,7 +521,7 @@ def custom_client_download(handler, gamename, resource):
     06 91 05 ce - Checksum
     fd 58 a4 1c - Player ID
     04 00 00 00 - Packet size
-    00 00 00 00 - ???
+    00 00 00 00 - Info?
 
     Response example:
     0000   02 00 00 00 00 00 00 00 73 c7 c8 00 d0 b5 00 00
@@ -536,23 +559,21 @@ def custom_client_download(handler, gamename, resource):
 
     handler.log_message("SBS download request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
-
-    # WIP
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
 
     # Generate response
     # Dummy
-    sake_fileid = 0x00c8c773
-    sake_filesize = 0x0000b5d0
+    sake_fileid = 13158262
+    sake_filesize = 528
     delivery_date = datetime(2014, 5, 18, 17, 48, 0)
     current_time = delivery_date
     # current_time = datetime.now()
-    message = b"\x02\x00\x00\x00"                   # Download
-    message += b"\x00\x00\x00\x00"                  # Response code
-    message += struct.pack("<I", sake_fileid)       # Sake file id
-    message += struct.pack("<I", sake_filesize)     # Sake file size
-    message += pack_date(delivery_date)             # Delivery time
-    message += pack_date(current_time)              # Current time
+    message = struct.pack("<i", SBS.Command.DOWNLOAD)
+    message += struct.pack("<i", SBS.Response.SUCCESS)
+    message += struct.pack("<I", sake_fileid)
+    message += struct.pack("<I", sake_filesize)
+    message += pack_date(delivery_date)
+    message += pack_date(current_time)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
@@ -585,13 +606,11 @@ def custom_client_wincount(handler, gamename, resource):
 
     handler.log_message("SBS wincount request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
-
-    # WIP
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
 
     # Generate response
-    message = b"\x03\x00\x00\x00"   # WinCount
-    message += b"\x00\x00\x00\x00"  # Response code
+    message = struct.pack("<i", SBS.Command.WINCOUNT)
+    message += struct.pack("<i", SBS.Response.SUCCESS)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
@@ -607,18 +626,18 @@ def custom_client_upload(handler, gamename, resource):
      - data: Base64 urlsafe encoded data to upload
 
     Example (data base64 urlsafe decoded):
-    0000  06 91 06 d4 54 00 00 00  14 00 00 00 02 00 00 00  |....T...........|
-    0010  07 00 00 00 90 02 00 00  00 00 00 00 00 00 00 00  |................|
+    0000  06 91 05 27 54 00 00 00  14 00 00 00 01 00 00 00  |...'T...........|
+    0010  75 c7 c8 00 20 0b 00 00  00 00 00 00 58 00 00 00  |u... .......X...|
 
     Description:
-    06 91 06 d4 - Checksum
+    06 91 05 27 - Checksum
     54 00 00 00 - Player ID
     14 00 00 00 - Packet size
-    02 00 00 00 - ???
-    07 00 00 00 - Sake file ID
-    90 02 00 00 - Sake file size
-    00 00 00 00 - ???
-    00 00 00 00 - ???
+    01 00 00 00 - Packet type (0x01 - Spectator, 0x02 - Submission)
+    75 c7 c8 00 - Sake file ID
+    20 0b 00 00 - Sake file size
+    00 00 00 00 - Battle info 1
+    58 00 00 00 - Battle info 2 (winner's pid?)
     """
     qs = urlparse.urlparse(resource).query
     q = urlparse.parse_qs(qs)
@@ -629,13 +648,11 @@ def custom_client_upload(handler, gamename, resource):
 
     handler.log_message("SBS upload request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
-
-    # WIP
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
 
     # Generate response
-    message = b"\x01\x00\x00\x00"   # Post complete
-    message += b"\x00\x00\x00\x00"  # Response code
+    message = struct.pack("<i", SBS.Command.COMPLETE)
+    message += struct.pack("<i", SBS.Response.SUCCESS)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
