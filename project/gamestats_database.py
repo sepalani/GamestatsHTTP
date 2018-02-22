@@ -330,6 +330,27 @@ class GamestatsDatabase(object):
             return self.web_get2_nearlo(gamename, pid, region, category, data)
         raise ValueError("Unknown get2 mode: {}".format(mode))
 
+    def sbs_check(self, gamename, pid, packet_type):
+        # TODO - Check storage size
+        return True
+
+    def sbs_download(self, gamename, pid, packet_type):
+        # TODO - Download
+        sake_fileid = None
+        sake_filesize = 0
+        delivery_time = datetime.now()
+        return sake_fileid, sake_filesize, delivery_time
+
+    def sbs_wincount(self, gamename, pid, sake_fileid):
+        # TODO - Win count
+        return True
+
+    def sbs_upload(self, gamename, pid, packet_type,
+                   sake_fileid, sake_filesize,
+                   battle_info1, battle_info2):
+        # TODO - Upload
+        return False
+
 
 def root_download(gamename, pid, region, db_path=DATABASE_PATH):
     with GamestatsDatabase(db_path) as db:
@@ -351,6 +372,36 @@ def web_get2(gamename, pid, region, category, mode, data,
              db_path=DATABASE_PATH):
     with GamestatsDatabase(db_path) as db:
         return db.web_get2(gamename, pid, region, category, mode, data)
+
+
+def sbs_check(gamename, pid, packet_type,
+              db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.sbs_check(gamename, pid, packet_type)
+
+
+def sbs_download(gamename, pid, packet_type,
+                 db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.sbs_download(gamename, pid, packet_type)
+
+
+def sbs_wincount(gamename, pid, sake_fileid,
+                 db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.sbs_wincount(gamename, pid, sake_fileid)
+
+
+def sbs_upload(gamename, pid, packet_type,
+               sake_fileid, sake_filesize,
+               battle_info1, battle_info2,
+               db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.sbs_upload(
+            gamename, pid, packet_type,
+            sake_fileid, sake_filesize,
+            battle_info1, battle_info2
+        )
 
 
 if __name__ == "__main__":

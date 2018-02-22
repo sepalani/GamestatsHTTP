@@ -496,10 +496,18 @@ def custom_client_check(handler, gamename, resource):
     handler.log_message("SBS check request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
+    checksum, pid, packet_len, packet_type = \
+        struct.unpack_from("<IIII", data)
+
+    # TODO - Check storage size
+    if gamestats_database.sbs_check(gamename, pid, packet_type):
+        response = SBS.Response.SUCCESS
+    else:
+        response = SBS.Response.STORAGE_SIZE_FULL
 
     # Generate response
     message = struct.pack("<i", SBS.Command.UPLOAD)
-    message += struct.pack("<i", SBS.Response.SUCCESS)
+    message += struct.pack("<i", response)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
@@ -521,7 +529,7 @@ def custom_client_download(handler, gamename, resource):
     06 91 05 ce - Checksum
     fd 58 a4 1c - Player ID
     04 00 00 00 - Packet size
-    00 00 00 00 - Info?
+    00 00 00 00 - Packet type?
 
     Response example:
     0000   02 00 00 00 00 00 00 00 73 c7 c8 00 d0 b5 00 00
@@ -560,16 +568,23 @@ def custom_client_download(handler, gamename, resource):
     handler.log_message("SBS download request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
+    checksum, pid, packet_len, packet_type = \
+        struct.unpack_from("<IIII", data)
+
+    # Download
+    sake_fileid, sake_filesize, delivery_date = \
+        gamestats_database.sbs_download(gamename, pid, packet_type)
+    if sake_fileid is not None:
+        response = SBS.Response.SUCCESS
+    else:
+        sake_fileid = 0
+        response = SBS.Response.RECORD_NOT_FOUND
 
     # Generate response
-    # Dummy
-    sake_fileid = 13158262
-    sake_filesize = 528
-    delivery_date = datetime(2014, 5, 18, 17, 48, 0)
     current_time = delivery_date
     # current_time = datetime.now()
     message = struct.pack("<i", SBS.Command.DOWNLOAD)
-    message += struct.pack("<i", SBS.Response.SUCCESS)
+    message += struct.pack("<i", response)
     message += struct.pack("<I", sake_fileid)
     message += struct.pack("<I", sake_filesize)
     message += pack_date(delivery_date)
@@ -608,9 +623,17 @@ def custom_client_wincount(handler, gamename, resource):
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
 
+    # Win count
+    checksum, pid, packet_len, sake_fileid = \
+        struct.unpack_from("<IIII", data)
+    if gamestats_database.sbs_wincount(gamename, pid, sake_fileid):
+        response = SBS.Response.SUCCESS
+    else:
+        response = SBS.Response.WINCOUNT_NOT_FOUND
+
     # Generate response
     message = struct.pack("<i", SBS.Command.WINCOUNT)
-    message += struct.pack("<i", SBS.Response.SUCCESS)
+    message += struct.pack("<i", response)
     message += gamestats_keys.do_hmac(key, message)
     handler.send_message(message)
 
@@ -649,6 +672,16 @@ def custom_client_upload(handler, gamename, resource):
     handler.log_message("SBS upload request for {}: {}".format(gamename, q))
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
+    checksum, pid, packet_len, packet_type, sake_fileid, sake_filesize, \
+        battle_info1, battle_info2 = struct.unpack_from("<IIIIIIII", data)
+
+    # Upload
+    if gamestats_database.sbs_upload(gamename, pid, packet_type,
+                                     sake_fileid, sake_filesize,
+                                     battle_info1, battle_info2):
+        response = SBS.Response.SUCCESS
+    else:
+        response = SBS.Response.NO_FILE
 
     # Generate response
     message = struct.pack("<i", SBS.Command.COMPLETE)
