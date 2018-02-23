@@ -54,6 +54,20 @@ def init(path=DATABASE_PATH):
     c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_ranking"
               " ON ranking (gamename, pid, region, category)")
 
+    # Smash Bros. Service
+    c.execute("CREATE TABLE IF NOT EXISTS sbs_data"
+              " (gamename TEXT, pid INT, sbs_type INT,"
+              " sake_id INT, sake_size INT, info TEXT,"
+              " delivery DATETIME)")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_sake_id"
+              " ON sbs_data (gamename, sbs_type, sake_id)")
+
+    c.execute("CREATE TABLE IF NOT EXISTS sbs_data_viewer"
+              " (gamename TEXT, sbs_type INT, sake_id INT,"
+              "  viewer_pid INT, seen DATETIME)")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_sake_viewer_id"
+              " ON sbs_data_viewer (gamename, sbs_type, sake_id, viewer_pid)")
+
     conn.commit()
     conn.close()
 
@@ -335,21 +349,55 @@ class GamestatsDatabase(object):
         return True
 
     def sbs_download(self, gamename, pid, packet_type):
-        # TODO - Download
-        sake_fileid = None
-        sake_filesize = 0
-        delivery_time = datetime.now()
-        return sake_fileid, sake_filesize, delivery_time
+        try:
+            with closing(self.conn.cursor()) as cursor:
+                sbs_type = 1 if packet_type == 0 else 2
+                cursor.execute(
+                    "SELECT * FROM sbs_data"
+                    " WHERE gamename = ? AND sbs_type = ?"
+                    " AND NOT EXISTS ("
+                    "     SELECT 1 FROM sbs_data_viewer"
+                    "     WHERE sbs_data.gamename = sbs_data_viewer.gamename"
+                    "     AND sbs_data.sbs_type = sbs_data_viewer.sbs_type"
+                    "     AND sbs_data.sake_id = sbs_data_viewer.sake_id"
+                    "     AND viewer_pid = ?"
+                    " ) LIMIT 1",
+                    (gamename, sbs_type, pid)
+                )
+                sbs = cursor.fetchone()
+                if sbs:
+                    cursor.execute(
+                        "INSERT INTO sbs_data_viewer VALUES (?,?,?,?,?)",
+                        (sbs["gamename"], sbs["sbs_type"], sbs["sake_id"],
+                         pid, datetime.now())
+                    )
+                    self.conn.commit()
+                    return sbs["sake_id"], sbs["sake_size"], datetime.strptime(
+                        sbs["delivery"],
+                        "%Y-%m-%d %H:%M:%S.%f"
+                    )
+        except Exception as e:
+            pass
+        return None, 0, datetime.now()
 
     def sbs_wincount(self, gamename, pid, sake_fileid):
         # TODO - Win count
         return True
 
     def sbs_upload(self, gamename, pid, packet_type,
-                   sake_fileid, sake_filesize,
-                   battle_info1, battle_info2):
-        # TODO - Upload
-        return False
+                   sake_fileid, sake_filesize, battle_info):
+        try:
+            with closing(self.conn.cursor()) as cursor:
+                cursor.execute(
+                    "INSERT INTO sbs_data VALUES (?,?,?,?,?,?,?)",
+                    (gamename, pid, packet_type,
+                     sake_fileid, sake_filesize, battle_info,
+                     datetime.now())
+                )
+            self.conn.commit()
+            return True
+        except Exception as e:
+            return False
 
 
 def root_download(gamename, pid, region, db_path=DATABASE_PATH):
@@ -393,14 +441,12 @@ def sbs_wincount(gamename, pid, sake_fileid,
 
 
 def sbs_upload(gamename, pid, packet_type,
-               sake_fileid, sake_filesize,
-               battle_info1, battle_info2,
+               sake_fileid, sake_filesize, battle_info,
                db_path=DATABASE_PATH):
     with GamestatsDatabase(db_path) as db:
         return db.sbs_upload(
             gamename, pid, packet_type,
-            sake_fileid, sake_filesize,
-            battle_info1, battle_info2
+            sake_fileid, sake_filesize, battle_info
         )
 
 

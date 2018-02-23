@@ -676,9 +676,9 @@ def custom_client_upload(handler, gamename, resource):
         battle_info1, battle_info2 = struct.unpack_from("<IIIIIIII", data)
 
     # Upload
+    battle_info = struct.pack("<II", battle_info1, battle_info2)
     if gamestats_database.sbs_upload(gamename, pid, packet_type,
-                                     sake_fileid, sake_filesize,
-                                     battle_info1, battle_info2):
+                                     sake_fileid, sake_filesize, battle_info):
         response = SBS.Response.SUCCESS
     else:
         response = SBS.Response.NO_FILE
