@@ -68,6 +68,13 @@ def init(path=DATABASE_PATH):
     c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_sake_viewer_id"
               " ON sbs_data_viewer (gamename, sbs_type, sake_id, viewer_pid)")
 
+    # Ban system
+    c.execute("CREATE TABLE IF NOT EXISTS bans"
+              " (gamename TEXT, pid INT, region INT, comment TEXT,"
+              " updated DATETIME)")
+    c.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_unique_ban"
+              " ON bans (gamename, pid, region)")
+
     conn.commit()
     conn.close()
 
@@ -97,6 +104,15 @@ def sort_rows(data, rows, mine=None):
     return [mine] + rows
 
 
+def filter_bans():
+    return (
+        " AND pid NOT IN ("
+        " SELECT pid FROM bans"
+        " WHERE gamename = :gamename AND (region & :region)"
+        ")"
+    )
+
+
 class GamestatsDatabase(object):
     """Gamestats database class."""
     FILTERS = {
@@ -119,6 +135,73 @@ class GamestatsDatabase(object):
     def close(self):
         self.conn.close()
 
+    def get_games(self):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                'SELECT gamename,'
+                ' COUNT(*) AS "stats",'
+                ' (SELECT COUNT(*) FROM bans'
+                ' WHERE bans.gamename = ranking.gamename) AS "bans"'
+                ' FROM ranking GROUP BY gamename'
+            )
+            return cursor.fetchall()
+
+    def get_users(self, gamename):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                'SELECT gamename, pid, region, category, score, updated,'
+                ' COUNT(*) AS "stats",'
+                ' (SELECT COUNT(*) FROM bans'
+                ' WHERE bans.gamename = :gamename'
+                ' AND bans.pid = ranking.pid'
+                ' AND bans.region & ranking.region) AS "bans"'
+                ' FROM ranking'
+                ' WHERE gamename = :gamename'
+                ' GROUP BY pid, region', {
+                    "gamename": gamename
+                }
+            )
+            return cursor.fetchall()
+
+    def has_ban(self, gamename, pid, region):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM bans"
+                " WHERE gamename = ? AND pid = ? AND region & ?",
+                (gamename, pid, region)
+            )
+            return cursor.fetchone()
+
+    def get_bans_from(self, gamename):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "SELECT * FROM bans WHERE gamename = ?",
+                (gamename,)
+            )
+            return cursor.fetchall()
+
+    def get_bans(self):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute("SELECT * FROM bans")
+            return cursor.fetchall()
+
+    def create_ban(self, gamename, pid, region, comment):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "INSERT OR REPLACE INTO bans VALUES (?,?,?,?,?)",
+                (gamename, pid, region, comment, datetime.now())
+            )
+        self.conn.commit()
+
+    def delete_ban(self, gamename, pid, region):
+        with closing(self.conn.cursor()) as cursor:
+            cursor.execute(
+                "DELETE FROM bans"
+                " WHERE gamename = ? AND pid = ? AND (region & ?) > 0",
+                (gamename, pid, region)
+            )
+        self.conn.commit()
+
     def root_download(self, gamename, pid, region):
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
@@ -137,6 +220,10 @@ class GamestatsDatabase(object):
         self.conn.commit()
 
     def web_put2(self, gamename, pid, region, category, score, data):
+        # Ban system
+        if self.has_ban(gamename, pid, region):
+            raise ValueError("User {} banned from {}".format(pid, gamename))
+
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
                 "INSERT OR REPLACE INTO ranking VALUES (?,?,?,?,?,?,?)",
@@ -146,76 +233,100 @@ class GamestatsDatabase(object):
 
     def web_get2_own(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
-            limit = ''
-            parameters = (gamename, region, category, data["since"])
-            if data.get("limit", 0):
-                limit = " LIMIT ?"
-                parameters = parameters + (data["limit"],)
+            parameters = {
+                "gamename": gamename,
+                "pid": pid,
+                "region": region,
+                "category": category,
+                "updated": data["since"],
+                "limit": data.get("limit")
+            }
+            limit = " LIMIT :limit" if data.get("limit", 0) else ""
+            where_filter = (
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category" + filter_bans() +
+                " AND updated >= :updated"
+            )
             cursor.execute(
-                "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ? ORDER BY score {}".format(
+                "SELECT * FROM ranking" + where_filter +
+                " ORDER BY score {}".format(
                     self.FILTERS.get(data.get("filter"), "")
                 ) + limit, parameters
             )
             rows = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ?",
-                (gamename, region, category, data["since"])
+                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
+                parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, rows)
 
     def web_get2_top(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
+            parameters = {
+                "gamename": gamename,
+                "pid": pid,
+                "region": region,
+                "category": category,
+                "updated": data["since"],
+                "limit": data.get("limit", 10)
+            }
+            where_filter = (
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category" + filter_bans() +
+                " AND updated >= :updated"
+            )
             cursor.execute(
-                "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ? ORDER BY score {} LIMIT ?".format(
+                "SELECT * FROM ranking" + where_filter +
+                " ORDER BY score {} LIMIT :limit".format(
                     self.FILTERS.get(data.get("filter"), "")
                 ),
-                (gamename, region, category,
-                 data["since"], data.get("limit", 10))
+                parameters
             )
             rows = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND updated >= ?",
-                (gamename, region, category, data["since"])
+                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
+                parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, rows)
 
     def web_get2_nearby(self, gamename, pid, region, category, data):
         with closing(self.conn.cursor()) as cursor:
+            parameters = {
+                "gamename": gamename,
+                "pid": pid,
+                "region": region,
+                "category": category,
+                "updated": data["since"],
+                "limit": data.get("limit", 10) - 1
+            }
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid = ?",
-                (gamename, region, category, pid)
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category AND pid = :pid",
+                parameters
             )
             mine = cursor.fetchone()
             if not mine:
                 mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            parameters["score"] = mine["score"]
+            where_filter = (
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category" + filter_bans() +
+                " AND pid != :pid AND updated >= :updated"
+            )
             cursor.execute(
-                "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND updated >= ?"
-                " ORDER BY ABS(? - score) {} LIMIT ?".format(
+                "SELECT * FROM ranking" + where_filter +
+                " ORDER BY ABS(:score - score) {} LIMIT :limit".format(
                     self.FILTERS.get(data.get("filter"), "")
                 ),
-                (gamename, region, category, pid, data["since"],
-                 mine["score"], data.get("limit", 10) - 1)
+                parameters
             )
             others = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND updated >= ?",
-                (gamename, region, category, pid, data["since"])
+                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
+                parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, others, mine)
@@ -257,32 +368,41 @@ class GamestatsDatabase(object):
     def web_get2_nearhi(self, gamename, pid, region, category, data):
         # TODO - Nearby high?
         with closing(self.conn.cursor()) as cursor:
+            parameters = {
+                "gamename": gamename,
+                "pid": pid,
+                "region": region,
+                "category": category,
+                "updated": data["since"],
+                "limit": data.get("limit", 10) - 1
+            }
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid = ?",
-                (gamename, region, category, pid)
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category AND pid = :pid",
+                parameters
             )
             mine = cursor.fetchone()
             if not mine:
                 mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            parameters["score"] = mine["score"]
+            where_filter = (
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category" + filter_bans() +
+                " AND pid != :pid AND (score - :score) >= 0"
+                " AND updated >= :updated"
+            )
             cursor.execute(
-                "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND (score - ?) >= 0 AND updated >= ?"
-                " ORDER BY score {} LIMIT ?".format(
+                "SELECT * FROM ranking" + where_filter +
+                " ORDER BY score {} LIMIT :limit".format(
                     self.FILTERS.get(data.get("filter"), "")
                 ),
-                (gamename, region, category, pid, mine["score"],
-                 data["since"], data.get("limit", 10) - 1)
+                parameters
             )
             others = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND (score - ?) >= 0 AND updated >= ?",
-                (gamename, region, category, pid, mine["score"],
-                 data["since"])
+                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
+                parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, others, mine)
@@ -290,37 +410,50 @@ class GamestatsDatabase(object):
     def web_get2_nearlo(self, gamename, pid, region, category, data):
         # TODO - Nearby low?
         with closing(self.conn.cursor()) as cursor:
+            parameters = {
+                "gamename": gamename,
+                "pid": pid,
+                "region": region,
+                "category": category,
+                "updated": data["since"],
+                "limit": data.get("limit", 10) - 1
+            }
             cursor.execute(
                 "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid = ?",
-                (gamename, region, category, pid)
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category AND pid = :pid",
+                parameters
             )
             mine = cursor.fetchone()
             if not mine:
                 mine = get2_dictrow(gamename, pid, 0xFFFFFFFF, category)
+            parameters["score"] = mine["score"]
+            where_filter = (
+                " WHERE gamename = :gamename AND region & :region"
+                " AND category = :category" + filter_bans() +
+                " AND pid != :pid AND (score - :score) <= 0"
+                " AND updated >= :updated"
+            )
             cursor.execute(
-                "SELECT * FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND (score - ?) <= 0 AND updated >= ?"
-                " ORDER BY score {} LIMIT ?".format(
+                "SELECT * FROM ranking" + where_filter +
+                " ORDER BY score {} LIMIT :limit".format(
                     self.FILTERS.get(data.get("filter"), "")
                 ),
-                (gamename, region, category, pid, mine["score"],
-                 data["since"], data.get("limit", 10) - 1)
+                parameters
             )
             others = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking"
-                " WHERE gamename = ? AND region & ? AND category = ?"
-                " AND pid != ? AND (score - ?) <= 0 AND updated >= ?",
-                (gamename, region, category, pid, mine["score"],
-                 data["since"])
+                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
+                parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, others, mine)
 
     def web_get2(self, gamename, pid, region, category, mode, data):
+        # Ban system
+        if self.has_ban(gamename, pid, region):
+            raise ValueError("User {} banned from {}".format(pid, gamename))
+
         # Time filter
         if data.get("updated", 0):
             data["since"] = datetime.now() - timedelta(minutes=data["updated"])
@@ -450,5 +583,288 @@ def sbs_upload(gamename, pid, packet_type,
         )
 
 
+def get_games(db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.get_games()
+
+
+def get_users(gamename, db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.get_users(gamename)
+
+
+def has_ban(gamename, pid, region, db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.has_ban(gamename, pid, region)
+
+
+def get_bans_from(gamename, db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.get_bans_from(gamename)
+
+
+def get_bans(db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.get_bans()
+
+
+def create_ban(gamename, pid, region, comment,
+               db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.create_ban(gamename, pid, region, comment)
+
+
+def delete_ban(gamename, pid, region,
+               db_path=DATABASE_PATH):
+    with GamestatsDatabase(db_path) as db:
+        return db.delete_ban(gamename, pid, region)
+
+
 if __name__ == "__main__":
-    pass
+    from cmd import Cmd
+
+    def to_int(name, value):
+        try:
+            return int(value)
+        except Exception:
+            print("ERROR: `{}` needs to be an integer".format(name))
+            return None
+
+    class GamestatsGameCmd(Cmd):
+        """Commands:
+        show bans [pid]
+        show stats [pid]
+        ban pid region_mask [comment]
+        unban pid region_mask
+        """
+
+        def do_show(self, inp):
+            """
+            show (bans|stats) [pid]
+                Show all bans/stats or the pid's ban/stats.
+            """
+            parameters = inp.split(None, 1)
+            if len(parameters) == 1:
+                mode = parameters[0]
+                pid = None
+            elif len(parameters) == 2:
+                mode, pid = parameters
+                pid = to_int("pid", pid)
+                if pid is None:
+                    return
+            else:
+                print("ERROR: Invalid parameter count!")
+                return
+            if mode == "bans":
+                ban_list = get_bans_from(self.gamename)
+                if pid is not None:
+                    ban_list = [
+                        u for u in ban_list
+                        if u["pid"] == pid
+                    ]
+                line_fmt = "| {:10s} | {:6s} | {:26s} | {:23s} |"
+                print(line_fmt.format("pid", "region", "date", "comment"))
+                print("|-{}-|-{}-|-{}-|-{}-|".format(
+                    "-"*10, "-"*6, "-"*26, "-"*23
+                ))
+                for user in ban_list:
+                    print(line_fmt.format(
+                        str(user["pid"]), str(user["region"]),
+                        str(user["updated"]), user["comment"]
+                    ))
+            elif mode == "stats":
+                user_list = get_users(self.gamename)
+                if pid is not None:
+                    user_list = [
+                        u for u in user_list
+                        if u["pid"] == pid and u["bans"] == 0
+                    ]
+                line_fmt = "| {:10s} | {:6s} | {:8s} | {:10s} | {:26s} |"
+                print(line_fmt.format("pid", "region", "category", "score",
+                                      "date"))
+                print("|-{}-|-{}-|-{}-|-{}-|-{}-|".format(
+                    "-"*10, "-"*6, "-"*8, "-"*10, "-"*26
+                ))
+                for user in user_list:
+                    print(line_fmt.format(
+                        str(user["pid"]), str(user["region"]),
+                        str(user["category"]), str(user["score"]),
+                        str(user["updated"])
+                    ))
+            else:
+                print("ERROR: Invalid mode `{}`".format(mode))
+
+        def complete_show(self, text, line, begidx, endidx):
+            user_list = [u for u in self.users]
+            argidx = len(line.split())
+            argidx += int(argidx > 1 and not text)
+            if argidx == 1:
+                return ["bans", "stats"]
+            elif argidx == 2:
+                return ["bans"] if "bans".startswith(text) \
+                    else ["stats"] if "stats".startswith(text) \
+                    else []
+            elif argidx == 3:
+                return [
+                    u["pid"]
+                    for u in user_list
+                    if u["pid"].startswith(text)
+                ]
+            return []
+
+        def do_ban(self, inp):
+            """
+            ban pid region_mask [comment]
+                Ban the pid based on the region mask (65535 = all regions).
+            """
+            parameters = inp.split(None, 2)
+            if len(parameters) < 2:
+                print("ERROR: Missing parameters!")
+                return
+            if len(parameters) == 2:
+                pid, region_mask = parameters
+                comment = ""
+            else:
+                pid, region_mask, comment = parameters
+            pid = to_int("pid", pid)
+            region_mask = to_int("region_mask", region_mask)
+            if pid is not None and region_mask is not None:
+                create_ban(self.gamename, pid, region_mask, comment)
+                print("INFO: PID {} banned from region {} (reason: {})".format(
+                    pid, region_mask, comment
+                ))
+                self.do_refresh("")
+
+        def complete_ban(self, text, line, begidx, endidx):
+            argv = line.split()
+            argc = len(argv) + int(len(argv) > 1 and not text)
+            user_list = []
+            if 1 <= argc <= 3:
+                user_list = [
+                    u for u in self.users
+                    if u["bans"] == "0"
+                ]
+                if argc >= 2:
+                    pid = text if argc == 2 else argv[1]
+                    user_list = [
+                        u for u in user_list
+                        if u["pid"].startswith(pid)
+                    ]
+                if argc == 3:
+                    return [
+                        u["region"] for u in user_list
+                        if u["region"].startswith(text)
+                    ]
+            return [u["pid"] for u in user_list]
+
+        def do_unban(self, inp):
+            """
+            unban pid region_mask
+                Unban the pid based on the region mask (65535 = all regions).
+            """
+            parameters = inp.split(None, 2)
+            if len(parameters) < 2:
+                print("ERROR: Missing parameters!")
+                return
+            pid, region_mask = parameters
+            pid = to_int("pid", pid)
+            region_mask = to_int("region_mask", region_mask)
+            if pid is not None and region_mask is not None:
+                delete_ban(self.gamename, pid, region_mask)
+                print("INFO: PID {} unbanned from region {}".format(
+                    pid, region_mask
+                ))
+                self.do_refresh("")
+
+        def complete_unban(self, text, line, begidx, endidx):
+            argv = line.split()
+            argc = len(argv) + int(len(argv) > 1 and not text)
+            user_list = []
+            if 1 <= argc <= 3:
+                user_list = [
+                    u for u in self.users
+                    if u["bans"] == "1"
+                ]
+                if argc >= 2:
+                    pid = text if argc == 2 else argv[1]
+                    user_list = [
+                        u for u in user_list
+                        if u["pid"].startswith(pid)
+                    ]
+                if argc == 3:
+                    return [
+                        u["region"] for u in user_list
+                        if u["region"].startswith(text)
+                    ]
+            return [u["pid"] for u in user_list]
+
+        def do_refresh(self, inp):
+            """
+            refresh
+                Refresh data for the auto-completion system.
+            """
+            self.users = [
+                {k: str(v) for k, v in u.items()}
+                for u in get_users(self.gamename)
+            ]
+
+        def do_exit(self, inp):
+            """
+            Exit the game CLI.
+            """
+            return True
+
+        do_EOF = do_exit
+
+    class GamestatsCmd(Cmd):
+        prompt = "\ngamestats2(http)> "
+        intro = "\nGamestats2 HTTP CLI\n\nEnter '?' for help.\n"
+
+        def do_show(self, inp):
+            """
+            show
+                Show games ban and stats count.
+            """
+            self.games = get_games()
+            line_fmt = "| {:20s} | {:15s} | {:15s} |"
+            print(line_fmt.format("gamename", "stats count", "bans count"))
+            print("|-{0}-|-{1}-|-{1}-|".format("-"*20, "-"*15))
+            for game in self.games:
+                print(line_fmt.format(
+                    game["gamename"], str(game["stats"]), str(game["bans"])
+                ))
+
+        def do_use(self, gamename):
+            """
+            use gamename
+                Use gamename's subshell.
+            """
+            cmd = GamestatsGameCmd()
+            cmd.gamename = gamename
+            cmd.prompt = "\n{}> ".format(gamename)
+            cmd.users = [
+                {k: str(v) for k, v in u.items()}
+                for u in get_users(gamename)
+            ]
+            cmd.cmdloop()
+
+        def complete_use(self, text, line, begidx, endidx):
+            return [
+                game["gamename"] for game in self.games
+                if game["gamename"].startswith(text)
+            ]
+
+        def do_exit(self, inp):
+            """
+            Exit the CLI.
+            """
+            print("\nExiting...")
+            return True
+        do_EOF = do_exit
+
+    try:
+        cmd = GamestatsCmd()
+        cmd.games = get_games()
+        cmd.cmdloop()
+    except KeyboardInterrupt:
+        pass
