@@ -1,5 +1,5 @@
-# Format: Gamename Key
 # Gamestats HTTP keys
+# Format: Gamename Key
 
 3celsiuswii     LPthfFKJuQkxRPrvKZDL0002be35000017290000000177644f57
 3dpicrossds     rQbAENEWhAWKJqaTZMXE00032ce500007d050001000034ea3b84
