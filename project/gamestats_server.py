@@ -19,6 +19,7 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>.
 """
 
+import sys
 from optparse import OptionParser
 
 try:
@@ -37,6 +38,14 @@ from routers.web import GamestatsRouter
 
 class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
     """Gamestats HTTP request handler."""
+    def log_message(self, format, *args):
+        """Log message."""
+        sys.stderr.write("{} - - [{}] {}\n".format(
+            self.headers.get('x-forwarded-for', self.address_string()),
+            self.log_date_time_string(),
+            format % args
+        ))
+
     def send_message(self, message=None, code=200):
         """Send message."""
         self.send_response(code)
