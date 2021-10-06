@@ -94,14 +94,19 @@ def get2_dictrow(gamename, pid, region, category,
 
 def sort_rows(data, rows, mine=None):
     """Sort rows."""
-    if mine is None:
-        # Rows already sorted
-        return rows
-    if data.get("filter", 1):
-        rows.sort(key=lambda r: r["score"], reverse=True)
-    else:
-        rows.sort(key=lambda r: r["score"], reverse=False)
-    return [mine] + rows
+    # We sort rows manually if "mine" row is present.
+    if mine:
+        # Indeed, sorting "nearby" modes is hard to deal with using SQL only.
+        # Moreover, only the "mine" row holds the order value.
+        rows.sort(
+            key=lambda r: r["score"],
+            reverse=bool(data.get("filter", 1))  # 0=ASC, 1=DESC
+        )
+        return [mine] + rows
+    # Rows already sorted, we need to set the order value
+    for i, row in enumerate(rows):
+        rows[i]["order"] = i + 1
+    return rows
 
 
 def filter_bans():
@@ -114,6 +119,7 @@ def filter_bans():
 
 
 def get_row_mine(cursor, parameters):
+    # Retrieve user's row
     cursor.execute(
         "SELECT * FROM ranking"
         " WHERE gamename = :gamename AND region & :region"
@@ -121,15 +127,33 @@ def get_row_mine(cursor, parameters):
         parameters
     )
     mine = cursor.fetchone()
-    if mine:
-        return mine
-    # Default row
-    return get2_dictrow(
-        parameters["gamename"],
-        parameters["pid"],
-        0xFFFFFFFF,
-        parameters["category"]
+
+    # Default row if it doesn't exist
+    if not mine:
+        mine = get2_dictrow(
+            parameters["gamename"],
+            parameters["pid"],
+            0xFFFFFFFF,
+            parameters["category"]
+        )
+
+    # Compute the row's order
+    parameters["score"] = mine["score"]
+    where_filter = (
+        " WHERE gamename = :gamename AND region & :region"
+        " AND category = :category" + filter_bans()
     )
+    if parameters.get("filter", 1):
+        where_filter += " AND score > :score"  # DESC
+    else:
+        where_filter += " AND score < :score"  # ASC
+    cursor.execute(
+        "SELECT COUNT(*) AS total FROM ranking" + where_filter,
+        parameters
+    )
+    total = cursor.fetchone()["total"]
+    mine["order"] = 1 + total
+    return mine
 
 
 class GamestatsDatabase(object):
@@ -288,7 +312,8 @@ class GamestatsDatabase(object):
                 "region": region,
                 "category": category,
                 "updated": data["since"],
-                "limit": data.get("limit", 10)
+                "limit": data.get("limit", 10),
+                "filter": data.get("filter"),
             }
             where_filter = (
                 " WHERE gamename = :gamename AND region & :region"
@@ -318,7 +343,8 @@ class GamestatsDatabase(object):
                 "region": region,
                 "category": category,
                 "updated": data["since"],
-                "limit": data.get("limit", 10) - 1
+                "limit": data.get("limit", 10) - 1,
+                "filter": data.get("filter"),
             }
             mine = get_row_mine(cursor, parameters)
             parameters["score"] = mine["score"]
@@ -329,9 +355,7 @@ class GamestatsDatabase(object):
             )
             cursor.execute(
                 "SELECT * FROM ranking" + where_filter +
-                " ORDER BY ABS(:score - score) {} LIMIT :limit".format(
-                    self.FILTERS.get(data.get("filter"), "")
-                ),
+                " ORDER BY ABS(:score - score) LIMIT :limit",
                 parameters
             )
             others = cursor.fetchall()
@@ -350,18 +374,17 @@ class GamestatsDatabase(object):
                 "region": region,
                 "category": category,
                 "updated": data["since"],
-                "limit": data.get("limit", 10) - 1
+                "limit": data.get("limit", 10) - 1,
+                "filter": data.get("filter"),
             }
             mine = get_row_mine(cursor, parameters)
+            pids = ", ".join("{}".format(i) for i in data.get("friends", []))
             cursor.execute(
                 "SELECT * FROM ranking"
                 " WHERE gamename = :gamename AND region = :region"
                 " AND category = :category"
                 " AND pid IN ({}) AND updated >= :updated"
-                " ORDER BY score {} LIMIT :limit".format(
-                    ", ".join("{}".format(i) for i in data.get("friends", [])),
-                    self.FILTERS.get(data.get("filter"), "")
-                ),
+                " ORDER BY score LIMIT :limit".format(pids),
                 parameters
             )
             friends = cursor.fetchall()
@@ -369,9 +392,7 @@ class GamestatsDatabase(object):
                 "SELECT COUNT(*) AS total FROM ranking"
                 " WHERE gamename = :gamename AND region = :region"
                 " AND category = :category"
-                " AND pid IN ({}) AND updated >= :updated".format(
-                    ", ".join("{}".format(i) for i in data.get("friends", [])),
-                ),
+                " AND pid IN ({}) AND updated >= :updated".format(pids),
                 parameters
             )
             total = cursor.fetchone()["total"]
@@ -386,21 +407,20 @@ class GamestatsDatabase(object):
                 "region": region,
                 "category": category,
                 "updated": data["since"],
-                "limit": data.get("limit", 10) - 1
+                "limit": data.get("limit", 10) - 1,
+                "filter": data.get("filter"),
             }
             mine = get_row_mine(cursor, parameters)
             parameters["score"] = mine["score"]
             where_filter = (
                 " WHERE gamename = :gamename AND region & :region"
                 " AND category = :category" + filter_bans() +
-                " AND pid != :pid AND (score - :score) >= 0"
+                " AND pid != :pid AND score >= :score"
                 " AND updated >= :updated"
             )
             cursor.execute(
                 "SELECT * FROM ranking" + where_filter +
-                " ORDER BY score {} LIMIT :limit".format(
-                    self.FILTERS.get(data.get("filter"), "")
-                ),
+                " ORDER BY score ASC LIMIT :limit",
                 parameters
             )
             others = cursor.fetchall()
@@ -420,21 +440,20 @@ class GamestatsDatabase(object):
                 "region": region,
                 "category": category,
                 "updated": data["since"],
-                "limit": data.get("limit", 10) - 1
+                "limit": data.get("limit", 10) - 1,
+                "filter": data.get("filter"),
             }
             mine = get_row_mine(cursor, parameters)
             parameters["score"] = mine["score"]
             where_filter = (
                 " WHERE gamename = :gamename AND region & :region"
                 " AND category = :category" + filter_bans() +
-                " AND pid != :pid AND (score - :score) <= 0"
+                " AND pid != :pid AND score <= :score"
                 " AND updated >= :updated"
             )
             cursor.execute(
                 "SELECT * FROM ranking" + where_filter +
-                " ORDER BY score {} LIMIT :limit".format(
-                    self.FILTERS.get(data.get("filter"), "")
-                ),
+                " ORDER BY score DESC LIMIT :limit",
                 parameters
             )
             others = cursor.fetchall()
