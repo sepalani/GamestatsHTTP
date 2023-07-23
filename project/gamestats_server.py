@@ -40,8 +40,11 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
     """Gamestats HTTP request handler."""
     def log_message(self, format, *args):
         """Log message."""
+        client_addr = self.address_string()
+        if hasattr(self, "headers"):  # Missing on ill-formed requests
+            client_addr = self.headers.get('x-forwarded-for', client_addr)
         sys.stderr.write("{} - - [{}] {}\n".format(
-            self.headers.get('x-forwarded-for', self.address_string()),
+            client_addr,
             self.log_date_time_string(),
             format % args
         ))
