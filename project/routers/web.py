@@ -121,12 +121,10 @@ def pack_rows(row_total, rows, mode, data, handler):
                 )
                 updated = int((now - row_time).total_seconds() // 60)
             except Exception as e:
-                handler.log_message("Failed to parse time: {}".format(
-                    row.get("updated")
-                ))
+                handler.log_message(f'Failed to parse time: {row.get("updated")}')
                 updated = 0
         if updated < 0:
-            handler.log_message("Row from the future: {}".format(row_time))
+            handler.log_message(f"Row from the future: {row_time}")
             updated = 0
         # 4-byte alignment
         data_size = len(row["data"])
@@ -158,15 +156,15 @@ def root_download(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("Download request for {}: {}".format(gamename, q))
+    handler.log_message(f"Download request for {gamename}: {q}")
     data = gamestats_database.root_download(
         gamename,
         q["pid"][0], q["region"][0],
         handler.server.gamestats_db
     )
-    handler.log_message("Downloaded data for {}: {}".format(
-        gamename, tuple(data) if data else None
-    ))
+    handler.log_message(
+        f"Downloaded data for {gamename}: {tuple(data) if data else None}"
+    )
 
     if not data:
         handler.send_message(code=404)
@@ -189,7 +187,7 @@ def root_upload(handler, gamename, resource):
 
     # TODO - Check the hash
 
-    handler.log_message("Upload request for {}: {}".format(gamename, q))
+    handler.log_message(f"Upload request for {gamename}: {q}")
     data = gamestats_database.root_upload(
         gamename,
         q["pid"][0], q["region"][0], q["data"][0],
@@ -217,7 +215,7 @@ def root_store(handler, gamename, resource):
         return
 
     # TODO - Implement it properly
-    handler.log_message("Dummy store request for {}: {}".format(gamename, q))
+    handler.log_message(f"Dummy store request for {gamename}: {q}")
     handler.send_message(b"")
 
 
@@ -257,7 +255,7 @@ def client_get(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("Get request for {}: {}".format(gamename, q))
+    handler.log_message(f"Get request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, region, category, mode, mode_data_size = \
@@ -312,7 +310,7 @@ def client_put(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("Put request for {}: {}".format(gamename, q))
+    handler.log_message(f"Put request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, region, category, score, player_data_size = \
@@ -353,7 +351,7 @@ def client_get2(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("Get2 request for {}: {}".format(gamename, q))
+    handler.log_message(f"Get2 request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, region, category, mode, mode_data_size = \
@@ -411,7 +409,7 @@ def client_put2(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("Put2 request for {}: {}".format(gamename, q))
+    handler.log_message(f"Put2 request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, region, category, score, player_data_size = \
@@ -488,7 +486,7 @@ def custom_client_check(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("SBS check request for {}: {}".format(gamename, q))
+    handler.log_message(f"SBS check request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, packet_type = \
@@ -560,7 +558,7 @@ def custom_client_download(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("SBS download request for {}: {}".format(gamename, q))
+    handler.log_message(f"SBS download request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, packet_type = \
@@ -614,7 +612,7 @@ def custom_client_wincount(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("SBS wincount request for {}: {}".format(gamename, q))
+    handler.log_message(f"SBS wincount request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
 
@@ -664,7 +662,7 @@ def custom_client_upload(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("SBS upload request for {}: {}".format(gamename, q))
+    handler.log_message(f"SBS upload request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
     data = decode_data(q["data"][0], int(q["pid"][0]), key)
     checksum, pid, packet_len, packet_type, sake_fileid, sake_filesize, \
@@ -708,7 +706,7 @@ def pbrcheck_check(handler, gamename, resource):
     if require_challenge(q, handler):
         return
 
-    handler.log_message("Dummy check request for {}: {}".format(gamename, q))
+    handler.log_message(f"Dummy check request for {gamename}: {q}")
     key = handler.get_gamekey(gamename)
 
     # Generate response
@@ -722,11 +720,11 @@ def pbrcheck_check(handler, gamename, resource):
 def handle(handler, gamename, resource, resources={}):
     for prefix, callback in resources.items():
         if resource.startswith(prefix):
-            print("[{}] Handle {}".format(gamename, resource))
+            print(f"[{gamename}] Handle {resource}")
             callback(handler, gamename, resource)
             return True
 
-    print("[{}] Can't handle {}".format(gamename, resource))
+    print(f"[{gamename}] Can't handle {resource}")
     handler.send_message(code=404)
     return False
 

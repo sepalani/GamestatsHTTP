@@ -43,11 +43,9 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
         client_addr = self.address_string()
         if hasattr(self, "headers"):  # Missing on ill-formed requests
             client_addr = self.headers.get('x-forwarded-for', client_addr)
-        sys.stderr.write("{} - - [{}] {}\n".format(
-            client_addr,
-            self.log_date_time_string(),
-            format % args
-        ))
+        sys.stderr.write(
+            f"{client_addr} - - [{self.log_date_time_string()}] {format % args}\n"
+        )
 
     def send_message(self, message=None, code=200):
         """Send message."""
@@ -66,9 +64,7 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
         """Get game key."""
         key = self.server.gamestats_keys.get(gamename, "")
         if not key:
-            self.log_message(
-                "Missing gamestats secret for {}".format(gamename)
-            )
+            self.log_message(f"Missing gamestats secret for {gamename}")
             key = gs_keys.DUMMY_GAMESTATS_KEY
         return key
 
@@ -77,19 +73,19 @@ class GamestatsHTTPRequestHandler(BaseHTTPRequestHandler):
         if self.path.count("/") >= 2:
             _, gamename, path = self.path.split("/", 2)
             if not _:
-                return gamename.lower(), "/{}".format(path)
+                return gamename.lower(), f"/{path}"
         return None, self.path
 
     def do_GET(self):
         gamename, path = self.parse_path()
-        print("[{}] GET {}".format(gamename, path))
-        print("Key: {}".format(self.server.gamestats_keys.get(gamename, None)))
+        print(f"[{gamename}] GET {path}")
+        print(f"Key: {self.server.gamestats_keys.get(gamename, None)}")
         self.server.gamestats_router.do_GET(self, gamename, path)
 
     def do_POST(self):
         gamename, path = self.parse_path()
-        print("[{}] POST {}".format(gamename, path))
-        print("Key: {}".format(self.server.gamestats_keys.get(gamename, None)))
+        print(f"[{gamename}] POST {path}")
+        print(f"Key: {self.server.gamestats_keys.get(gamename, None)}")
         self.server.gamestats_router.do_POST(self, gamename, path)
 
 
@@ -181,7 +177,7 @@ if __name__ == "__main__":
     server = ssl_wrapper(opt, server)
 
     try:
-        print("Server: {} | Port: {}".format(opt.host, opt.port))
+        print(f"Server: {opt.host} | Port: {opt.port}")
         server.serve_forever()
     except KeyboardInterrupt:
         print("[Server] Closing...")

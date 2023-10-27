@@ -45,10 +45,10 @@ def key_constants_from_str(s):
     if len(s) >= 32:
         try:
             return GamestatsKeyConstants(
-                x=int(s[0:8], 16),
+                x=int(s[:8], 16),
                 y=int(s[8:16], 16),
                 z=int(s[16:24], 16),
-                checksum_secret=int(s[24:32], 16)
+                checksum_secret=int(s[24:32], 16),
             )
         except:
             pass
@@ -58,8 +58,8 @@ def key_constants_from_str(s):
 def key_from_str(s):
     """Return a GamestatsKey from str."""
     return GamestatsKey(
-        salt=s[0:20] if len(s) >= 20 else None,
-        constants=key_constants_from_str(s[20:52])
+        salt=s[:20] if len(s) >= 20 else None,
+        constants=key_constants_from_str(s[20:52]),
     )
 
 
@@ -111,5 +111,3 @@ def xor_data(key, data):
     return data
 
 
-if __name__ == "__main__":
-    pass
