@@ -26,9 +26,11 @@ class BaseRouter(object):
         self.commands = commands
         for command, routes in self.commands.items():
             setattr(
-                self, "do_{}".format(command),
-                lambda handler, gamename, path:
-                self.do(handler, gamename, path, routes)
+                self,
+                f"do_{command}",
+                lambda handler, gamename, path: self.do(
+                    handler, gamename, path, routes
+                ),
             )
 
     def do(self, handler, gamename, path, routes={}):
@@ -40,5 +42,3 @@ class BaseRouter(object):
         return False
 
 
-if __name__ == "__main__":
-    pass

@@ -29,10 +29,7 @@ DATABASE_TIMEOUT = 5.0
 
 
 def dict_factory(cursor, row):
-    d = {}
-    for idx, col in enumerate(cursor.description):
-        d[col[0]] = row[idx]
-    return d
+    return {col[0]: row[idx] for idx, col in enumerate(cursor.description)}
 
 
 def init(path=DATABASE_PATH):
@@ -148,8 +145,7 @@ def get_row_mine(cursor, parameters):
     else:
         where_filter += " AND score < :score"  # ASC
     cursor.execute(
-        "SELECT COUNT(*) AS total FROM ranking" + where_filter,
-        parameters
+        f"SELECT COUNT(*) AS total FROM ranking{where_filter}", parameters
     )
     total = cursor.fetchone()["total"]
     mine["order"] = 1 + total
@@ -265,7 +261,7 @@ class GamestatsDatabase(object):
     def web_put2(self, gamename, pid, region, category, score, data):
         # Ban system
         if self.has_ban(gamename, pid, region):
-            raise ValueError("User {} banned from {}".format(pid, gamename))
+            raise ValueError(f"User {pid} banned from {gamename}")
 
         with closing(self.conn.cursor()) as cursor:
             cursor.execute(
@@ -291,15 +287,18 @@ class GamestatsDatabase(object):
                 " AND updated >= :updated"
             )
             cursor.execute(
-                "SELECT * FROM ranking" + where_filter +
-                " ORDER BY score {}".format(
-                    self.FILTERS.get(data.get("filter"), "")
-                ) + limit, parameters
+                (
+                    (
+                        f"SELECT * FROM ranking{where_filter}"
+                        + f' ORDER BY score {self.FILTERS.get(data.get("filter"), "")}'
+                    )
+                    + limit
+                ),
+                parameters,
             )
             rows = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
-                parameters
+                f"SELECT COUNT(*) AS total FROM ranking{where_filter}", parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, rows)
@@ -321,16 +320,15 @@ class GamestatsDatabase(object):
                 " AND updated >= :updated"
             )
             cursor.execute(
-                "SELECT * FROM ranking" + where_filter +
-                " ORDER BY score {} LIMIT :limit".format(
-                    self.FILTERS.get(data.get("filter"), "")
+                (
+                    f"SELECT * FROM ranking{where_filter}"
+                    + f' ORDER BY score {self.FILTERS.get(data.get("filter"), "")} LIMIT :limit'
                 ),
-                parameters
+                parameters,
             )
             rows = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
-                parameters
+                f"SELECT COUNT(*) AS total FROM ranking{where_filter}", parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, rows)
@@ -354,14 +352,12 @@ class GamestatsDatabase(object):
                 " AND pid != :pid AND updated >= :updated"
             )
             cursor.execute(
-                "SELECT * FROM ranking" + where_filter +
-                " ORDER BY ABS(:score - score) LIMIT :limit",
-                parameters
+                f"SELECT * FROM ranking{where_filter} ORDER BY ABS(:score - score) LIMIT :limit",
+                parameters,
             )
             others = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
-                parameters
+                f"SELECT COUNT(*) AS total FROM ranking{where_filter}", parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, others, mine)
@@ -378,22 +374,15 @@ class GamestatsDatabase(object):
                 "filter": data.get("filter"),
             }
             mine = get_row_mine(cursor, parameters)
-            pids = ", ".join("{}".format(i) for i in data.get("friends", []))
+            pids = ", ".join(f"{i}" for i in data.get("friends", []))
             cursor.execute(
-                "SELECT * FROM ranking"
-                " WHERE gamename = :gamename AND region = :region"
-                " AND category = :category"
-                " AND pid IN ({}) AND updated >= :updated"
-                " ORDER BY score LIMIT :limit".format(pids),
-                parameters
+                f"SELECT * FROM ranking WHERE gamename = :gamename AND region = :region AND category = :category AND pid IN ({pids}) AND updated >= :updated ORDER BY score LIMIT :limit",
+                parameters,
             )
             friends = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking"
-                " WHERE gamename = :gamename AND region = :region"
-                " AND category = :category"
-                " AND pid IN ({}) AND updated >= :updated".format(pids),
-                parameters
+                f"SELECT COUNT(*) AS total FROM ranking WHERE gamename = :gamename AND region = :region AND category = :category AND pid IN ({pids}) AND updated >= :updated",
+                parameters,
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, friends, mine)
@@ -419,14 +408,12 @@ class GamestatsDatabase(object):
                 " AND updated >= :updated"
             )
             cursor.execute(
-                "SELECT * FROM ranking" + where_filter +
-                " ORDER BY score ASC LIMIT :limit",
-                parameters
+                f"SELECT * FROM ranking{where_filter} ORDER BY score ASC LIMIT :limit",
+                parameters,
             )
             others = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
-                parameters
+                f"SELECT COUNT(*) AS total FROM ranking{where_filter}", parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, others, mine)
@@ -452,14 +439,12 @@ class GamestatsDatabase(object):
                 " AND updated >= :updated"
             )
             cursor.execute(
-                "SELECT * FROM ranking" + where_filter +
-                " ORDER BY score DESC LIMIT :limit",
-                parameters
+                f"SELECT * FROM ranking{where_filter} ORDER BY score DESC LIMIT :limit",
+                parameters,
             )
             others = cursor.fetchall()
             cursor.execute(
-                "SELECT COUNT(*) AS total FROM ranking" + where_filter,
-                parameters
+                f"SELECT COUNT(*) AS total FROM ranking{where_filter}", parameters
             )
             total = cursor.fetchone()["total"]
             return total, sort_rows(data, others, mine)
@@ -467,7 +452,7 @@ class GamestatsDatabase(object):
     def web_get2(self, gamename, pid, region, category, mode, data):
         # Ban system
         if self.has_ban(gamename, pid, region):
-            raise ValueError("User {} banned from {}".format(pid, gamename))
+            raise ValueError(f"User {pid} banned from {gamename}")
 
         # Time filter
         if data.get("updated", 0):
@@ -490,7 +475,7 @@ class GamestatsDatabase(object):
         elif mode == 5:
             # Blind guess
             return self.web_get2_nearlo(gamename, pid, region, category, data)
-        raise ValueError("Unknown get2 mode: {}".format(mode))
+        raise ValueError(f"Unknown get2 mode: {mode}")
 
     def sbs_check(self, gamename, pid, packet_type):
         # TODO - Check storage size
@@ -512,8 +497,7 @@ class GamestatsDatabase(object):
                     " ) LIMIT 1",
                     (gamename, sbs_type, pid)
                 )
-                sbs = cursor.fetchone()
-                if sbs:
+                if sbs := cursor.fetchone():
                     cursor.execute(
                         "INSERT INTO sbs_data_viewer VALUES (?,?,?,?,?)",
                         (sbs["gamename"], sbs["sbs_type"], sbs["sake_id"],
@@ -642,7 +626,7 @@ if __name__ == "__main__":
         try:
             return int(value)
         except Exception:
-            print("ERROR: `{}` needs to be an integer".format(name))
+            print(f"ERROR: `{name}` needs to be an integer")
             return None
 
     class GamestatsGameCmd(Cmd):
@@ -679,9 +663,7 @@ if __name__ == "__main__":
                     ]
                 line_fmt = "| {:10s} | {:6s} | {:26s} | {:23s} |"
                 print(line_fmt.format("pid", "region", "date", "comment"))
-                print("|-{}-|-{}-|-{}-|-{}-|".format(
-                    "-"*10, "-"*6, "-"*26, "-"*23
-                ))
+                print(f'|-{"-" * 10}-|-{"-" * 6}-|-{"-" * 26}-|-{"-" * 23}-|')
                 for user in ban_list:
                     print(line_fmt.format(
                         str(user["pid"]), str(user["region"]),
@@ -697,9 +679,7 @@ if __name__ == "__main__":
                 line_fmt = "| {:10s} | {:6s} | {:8s} | {:10s} | {:26s} |"
                 print(line_fmt.format("pid", "region", "category", "score",
                                       "date"))
-                print("|-{}-|-{}-|-{}-|-{}-|-{}-|".format(
-                    "-"*10, "-"*6, "-"*8, "-"*10, "-"*26
-                ))
+                print(f'|-{"-" * 10}-|-{"-" * 6}-|-{"-" * 8}-|-{"-" * 10}-|-{"-" * 26}-|')
                 for user in user_list:
                     print(line_fmt.format(
                         str(user["pid"]), str(user["region"]),
@@ -707,18 +687,18 @@ if __name__ == "__main__":
                         str(user["updated"])
                     ))
             else:
-                print("ERROR: Invalid mode `{}`".format(mode))
+                print(f"ERROR: Invalid mode `{mode}`")
 
         def complete_show(self, text, line, begidx, endidx):
-            user_list = [u for u in self.users]
+            user_list = list(self.users)
             argidx = len(line.split())
             argidx += int(argidx > 1 and not text)
             if argidx == 1:
                 return ["bans", "stats"]
             elif argidx == 2:
                 return ["bans"] if "bans".startswith(text) \
-                    else ["stats"] if "stats".startswith(text) \
-                    else []
+                            else ["stats"] if "stats".startswith(text) \
+                            else []
             elif argidx == 3:
                 return [
                     u["pid"]
@@ -745,9 +725,7 @@ if __name__ == "__main__":
             region_mask = to_int("region_mask", region_mask)
             if pid is not None and region_mask is not None:
                 create_ban(self.gamename, pid, region_mask, comment)
-                print("INFO: PID {} banned from region {} (reason: {})".format(
-                    pid, region_mask, comment
-                ))
+                print(f"INFO: PID {pid} banned from region {region_mask} (reason: {comment})")
                 self.do_refresh("")
 
         def complete_ban(self, text, line, begidx, endidx):
@@ -786,9 +764,7 @@ if __name__ == "__main__":
             region_mask = to_int("region_mask", region_mask)
             if pid is not None and region_mask is not None:
                 delete_ban(self.gamename, pid, region_mask)
-                print("INFO: PID {} unbanned from region {}".format(
-                    pid, region_mask
-                ))
+                print(f"INFO: PID {pid} unbanned from region {region_mask}")
                 self.do_refresh("")
 
         def complete_unban(self, text, line, begidx, endidx):
@@ -856,7 +832,7 @@ if __name__ == "__main__":
             """
             cmd = GamestatsGameCmd()
             cmd.gamename = gamename
-            cmd.prompt = "\n{}> ".format(gamename)
+            cmd.prompt = f"\n{gamename}> "
             cmd.users = [
                 {k: str(v) for k, v in u.items()}
                 for u in get_users(gamename)
