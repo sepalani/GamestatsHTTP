@@ -43,8 +43,8 @@ CHALLENGE_CHARSET = string.ascii_letters + string.digits
 
 def generate_challenge(size=32):
     """Generate challenge."""
-    return "".join(
-        random.choice(CHALLENGE_CHARSET)
+    return bytearray(
+        ord(random.choice(CHALLENGE_CHARSET))
         for _ in range(size)
     )
 
@@ -116,7 +116,7 @@ def pack_rows(row_total, rows, mode, data, handler):
         else:
             try:
                 row_time = datetime.strptime(
-                    row["updated"],
+                    row["updated"].decode("ascii"),
                     "%Y-%m-%d %H:%M:%S.%f"
                 )
                 updated = int((now - row_time).total_seconds() // 60)
