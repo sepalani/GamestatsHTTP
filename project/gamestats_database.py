@@ -645,6 +645,24 @@ if __name__ == "__main__":
             print("ERROR: `{}` needs to be an integer".format(name))
             return None
 
+    def to_str(value):
+        if isinstance(value, str):
+            return value
+        elif isinstance(value, bytes):
+            return "".join(chr(b) for b in value)
+        return str(value)
+
+    def sanitize(d, *args):
+        """Sanitize values since sqlite doesn't enforce type."""
+        if not args:
+            # Sanitize the whole dict
+            return {k: to_str(v) for k, v in d.items()}
+        return (to_str(d[arg]) for arg in args)
+
+    def sanitize_list(ls):
+        """Sanitize list elements."""
+        return [sanitize(e) for e in ls]
+
     class GamestatsGameCmd(Cmd):
         """Commands:
         show bans [pid]
@@ -684,16 +702,15 @@ if __name__ == "__main__":
                 ))
                 for user in ban_list:
                     print(line_fmt.format(
-                        str(user["pid"]), str(user["region"]),
-                        str(user["updated"]), str(user["comment"])
+                        *sanitize(user, "pid", "region", "updated", "comment")
                     ))
             elif mode == "stats":
                 user_list = get_users(self.gamename)
-                if pid is not None:
-                    user_list = [
-                        u for u in user_list
-                        if u["pid"] == pid and u["bans"] == 0
-                    ]
+                # Hide stats from banned users unless the pid is specified
+                if pid is None:
+                    user_list = [u for u in user_list if u["bans"] == 0]
+                else:
+                    user_list = [u for u in user_list if u["pid"] == pid]
                 line_fmt = "| {:10s} | {:6s} | {:8s} | {:10s} | {:26s} |"
                 print(line_fmt.format("pid", "region", "category", "score",
                                       "date"))
@@ -702,9 +719,8 @@ if __name__ == "__main__":
                 ))
                 for user in user_list:
                     print(line_fmt.format(
-                        str(user["pid"]), str(user["region"]),
-                        str(user["category"]), str(user["score"]),
-                        str(user["updated"])
+                        *sanitize(user, "pid", "region", "category", "score",
+                                  "updated")
                     ))
             else:
                 print("ERROR: Invalid mode `{}`".format(mode))
@@ -818,10 +834,7 @@ if __name__ == "__main__":
             refresh
                 Refresh data for the auto-completion system.
             """
-            self.users = [
-                {k: str(v) for k, v in u.items()}
-                for u in get_users(self.gamename)
-            ]
+            self.users = sanitize_list(get_users(self.gamename))
 
         def do_exit(self, inp):
             """
@@ -840,14 +853,13 @@ if __name__ == "__main__":
             show
                 Show games ban and stats count.
             """
-            self.games = get_games()
+            self.games = sanitize_list(get_games())
             line_fmt = "| {:20s} | {:15s} | {:15s} |"
             print(line_fmt.format("gamename", "stats count", "bans count"))
             print("|-{0}-|-{1}-|-{1}-|".format("-"*20, "-"*15))
             for game in self.games:
                 print(line_fmt.format(
-                    str(game["gamename"]), str(game["stats"]),
-                    str(game["bans"])
+                    game["gamename"], game["stats"], game["bans"]
                 ))
 
         def do_use(self, gamename):
@@ -858,10 +870,7 @@ if __name__ == "__main__":
             cmd = GamestatsGameCmd()
             cmd.gamename = gamename
             cmd.prompt = "\n{}> ".format(gamename)
-            cmd.users = [
-                {k: str(v) for k, v in u.items()}
-                for u in get_users(gamename)
-            ]
+            cmd.users = sanitize_list(get_users(gamename))
             cmd.cmdloop()
 
         def complete_use(self, text, line, begidx, endidx):
@@ -876,11 +885,12 @@ if __name__ == "__main__":
             """
             print("\nExiting...")
             return True
+
         do_EOF = do_exit
 
     try:
         cmd = GamestatsCmd()
-        cmd.games = get_games()
+        cmd.games = sanitize_list(get_games())
         cmd.cmdloop()
     except KeyboardInterrupt:
         pass
