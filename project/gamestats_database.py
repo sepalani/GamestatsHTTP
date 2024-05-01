@@ -685,7 +685,7 @@ if __name__ == "__main__":
                 for user in ban_list:
                     print(line_fmt.format(
                         str(user["pid"]), str(user["region"]),
-                        str(user["updated"]), user["comment"]
+                        str(user["updated"]), str(user["comment"])
                     ))
             elif mode == "stats":
                 user_list = get_users(self.gamename)
@@ -846,7 +846,8 @@ if __name__ == "__main__":
             print("|-{0}-|-{1}-|-{1}-|".format("-"*20, "-"*15))
             for game in self.games:
                 print(line_fmt.format(
-                    game["gamename"], str(game["stats"]), str(game["bans"])
+                    str(game["gamename"]), str(game["stats"]),
+                    str(game["bans"])
                 ))
 
         def do_use(self, gamename):
